@@ -1,6 +1,22 @@
+
 import yfinance as yf
 import numpy as np
 import pandas as pd
+
+def get_data(ticker, start_date="1990-01-01", end_date="2025-01-01", interval="1mo"):
+    
+    data = yf.download(ticker, start=start_date, end=end_date, interval="1mo", progress=False)
+    if isinstance(data.columns, pd.MultiIndex):
+        data = pd.DataFrame({
+                "Close": data["Close"][ticker],
+                "Low": data["Low"][ticker],
+                "High": data["High"][ticker]
+            })
+    else:
+        data = data[["Close", "Low", "High"]]
+    data = data.dropna()
+
+    return data
 
 def kelly_leverage(mu, sigma, risk_free_rate=0.0):
     """
@@ -121,4 +137,4 @@ if __name__ == "__main__":
 
     kelly = kelly_leverage(mu=mu, sigma=sigma)
     print(kelly)
-  
+

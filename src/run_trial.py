@@ -7,7 +7,9 @@ import multiprocessing
 import os
 from functools import partial
 
-from run_sim import get_data, run_portfolio_simulation
+from utils import get_data
+from run_sim import run_portfolio_simulation
+
 
 # Note, need to install postgressql if not installed: https://www.postgresql.org/download/windows/
 

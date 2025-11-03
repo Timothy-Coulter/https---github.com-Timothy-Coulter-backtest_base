@@ -4,7 +4,9 @@
 import optuna
 import numpy as np
 import matplotlib.pyplot as plt
-from run_sim import get_data, run_portfolio_simulation
+
+from utils import get_data
+from run_sim import run_portfolio_simulation
 
 if __name__ == '__main__':
 

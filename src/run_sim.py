@@ -2,20 +2,7 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 
-def get_data(ticker, start_date="1990-01-01", end_date="2025-01-01", interval="1mo"):
-    
-    data = yf.download(ticker, start=start_date, end=end_date, interval="1mo", progress=False)
-    if isinstance(data.columns, pd.MultiIndex):
-        data = pd.DataFrame({
-                "Close": data["Close"][ticker],
-                "Low": data["Low"][ticker],
-                "High": data["High"][ticker]
-            })
-    else:
-        data = data[["Close", "Low", "High"]]
-    data = data.dropna()
 
-    return data
 
 def run_portfolio_simulation(
     data,
