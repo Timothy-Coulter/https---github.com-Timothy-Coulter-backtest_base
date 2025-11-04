@@ -5,8 +5,8 @@ import optuna
 import numpy as np
 import matplotlib.pyplot as plt
 
-from utils import get_data
-from run_sim import run_portfolio_simulation
+from utils import get_data  # type: ignore[import-not-found]
+from run_sim import run_portfolio_simulation  # type: ignore[import-not-found]
 
 if __name__ == '__main__':
 
@@ -69,9 +69,9 @@ if __name__ == '__main__':
     # ====================================
 
     # Extract results
-    returns = []
-    drawdowns = []
-    feasible_mask = []
+    returns: list[float] = []
+    drawdowns: list[float] = []
+    feasible_mask: list[bool] = []
 
     for t in study.trials:
         if not t.values:
@@ -81,9 +81,9 @@ if __name__ == '__main__':
         drawdowns.append(-neg_drawdown)  # back to actual drawdown (negative)
         feasible_mask.append(constraint_violation <= 0)
 
-    returns = np.array(returns)
-    drawdowns = np.array(drawdowns)
-    feasible_mask = np.array(feasible_mask)
+    returns = np.array(returns)  # type: ignore[assignment]
+    drawdowns = np.array(drawdowns)  # type: ignore[assignment]
+    feasible_mask = np.array(feasible_mask)  # type: ignore[assignment]
 
     # Compute Pareto front (feasible or all)
     points = np.column_stack([returns, drawdowns])
@@ -102,8 +102,9 @@ if __name__ == '__main__':
 
     # Plot
     plt.figure(figsize=(8,6))
-    plt.scatter(drawdowns[~feasible_mask]*100, returns[~feasible_mask], c="gray", alpha=0.5, label="Infeasible")
-    plt.scatter(drawdowns[feasible_mask]*100, returns[feasible_mask], c="blue", alpha=0.7, label="Feasible")
+    infeasible_mask = ~feasible_mask  # type: ignore[operator]
+    plt.scatter(drawdowns[infeasible_mask]*100, returns[infeasible_mask], c="gray", alpha=0.5, label="Infeasible")  # type: ignore[assignment, index, call-overload]
+    plt.scatter(drawdowns[feasible_mask]*100, returns[feasible_mask], c="blue", alpha=0.7, label="Feasible")  # type: ignore[assignment, index, call-overload]
     plt.plot(pareto_points[:,1]*100, pareto_points[:,0], "r--", linewidth=2, label="Pareto Frontier")
     plt.scatter(best_result["max_drawdown"]*100, best_result["total_return"], c="gold", s=100, edgecolor="black", label="Best Selected")
 

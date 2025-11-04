@@ -1,7 +1,7 @@
 [project]
 name = "quant-bench"
 version = "0.1.0"
-description = "Add your description here"
+description = "Quantitative Backtesting Framework"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -9,9 +9,244 @@ dependencies = [
     "numpy>=2.2.6",
     "optuna>=4.5.0",
     "pandas>=2.3.3",
+    "psutil>=7.1.3",
     "psycopg2-binary>=2.9.11",
+    "pydantic>=2.12.3",
+    "pytest>=8.4.2",
+    "python-dotenv>=1.0.0",
     "scikit-learn>=1.7.2",
     "scipy>=1.15.3",
     "tqdm>=4.67.1",
+    "types-psutil>=7.0.0.20251001",
     "yfinance>=0.2.66",
 ]
+authors = [
+    {name = "Quant Bench Team", email = "team@quantbench.com"}
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project.optional-dependencies]
+# Testing and development dependencies
+test = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-xdist>=3.0.0",
+    "pytest-mock>=3.0.0",
+    "pytest-asyncio>=0.21.0",
+    "coverage[toml]>=7.0.0",
+    "hypothesis>=6.0.0",
+]
+
+# Development dependencies (linting, formatting, type checking)
+dev = [
+    "mypy>=1.0.0",
+    "black>=22.0.0",
+    "isort>=5.0.0",
+    "ruff>=0.1.0",
+    "types-setuptools",
+]
+
+# All development and testing dependencies
+all = [
+    "mypy>=1.0.0",
+    "black>=22.0.0",
+    "isort>=5.0.0",
+    "ruff>=0.1.0",
+    "types-setuptools",
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-xdist>=3.0.0",
+    "pytest-mock>=3.0.0",
+    "pytest-asyncio>=0.21.0",
+    "coverage[toml]>=7.0.0",
+    "hypothesis>=6.0.0",
+]
+
+[tool.mypy]
+# Global configuration
+python_version = "3.10"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+# Show error codes
+show_error_codes = true
+
+# Plugin configuration
+plugins = ["pydantic.mypy"]
+
+# Ignore missing stubs for external libraries
+[[tool.mypy.overrides]]
+module = [
+    "yfinance.*",
+    "matplotlib.*",
+    "optuna.*",
+    "numpy.*",
+    "pandas.*"
+]
+ignore_missing_imports = true
+
+# Per-module options
+[[tool.mypy.overrides]]
+module = [
+    "backtester.core.backtest_engine",
+    "backtester.portfolio.portfolio",
+    "backtester.execution.broker"
+]
+warn_return_any = false
+
+# =============================================================================
+# Test Configuration
+# =============================================================================
+
+[tool.pytest.ini_options]
+# Test discovery
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+# Test options
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--verbose",
+    "--tb=short",
+    "-ra",
+]
+
+# Optional coverage options (only work if pytest-cov is installed)
+# Uncomment these lines if pytest-cov is installed:
+# addopts = [
+#     "--cov=backtester",
+#     "--cov-report=term-missing",
+#     "--cov-report=html:htmlcov",
+#     "--cov-report=xml:coverage.xml",
+#     "--cov-fail-under=80",
+# ]
+
+# Test markers
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests",
+    "slow: Slow tests that take more than 5 seconds",
+    "network: Tests that require network access",
+    "data: Tests that require data files",
+    "portfolio: Portfolio-related tests",
+    "strategy: Strategy-related tests",
+    "execution: Execution-related tests",
+    "core: Core backtesting engine tests",
+    "data_handler: Data handling tests",
+    "performance: Performance-related tests",
+    "app: Application-level tests",
+    "backtest: Backtest-related tests",
+    "optimization: Optimization tests",
+    "config: Configuration tests",
+    "factory: Factory tests",
+    "workflow: End-to-end workflow tests",
+    "api: API tests",
+    "cli: Command line interface tests",
+    "report: Report generation tests",
+    "export: Export functionality tests",
+]
+
+# Minimum version
+minversion = "7.0"
+
+# Logging for tests
+log_cli = true
+log_cli_level = "INFO"
+log_cli_format = "%(asctime)s [%(levelname)8s] %(name)s: %(message)s"
+log_cli_date_format = "%Y-%m-%d %H:%M:%S"
+
+# Filter warnings
+filterwarnings = [
+    "error",
+    "ignore::UserWarning",
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+    # Ignore missing imports for test modules
+    "ignore::ImportWarning:backtester.main",
+]
+
+# =============================================================================
+# Coverage Configuration
+# =============================================================================
+
+[tool.coverage.run]
+# Source files to include in coverage
+source = ["backtester"]
+branch = true
+parallel = true
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "*/__pycache__/*",
+    "*/site-packages/*",
+    "*/setup.py",
+    "*/mypy.ini",
+    "*/conftest.py",
+    "*/fixtures/*",
+    "*/test_fixtures.py",
+    "*/src/*",
+    "*/scripts/*",
+    "*/*/__init__.py",
+    "*/*/main.py",
+]
+
+[tool.coverage.report]
+# Coverage reporting options
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+
+precision = 2
+show_missing = true
+skip_covered = false
+sort = "Cover"
+fail_under = 80
+
+# Ignore missing files
+ignore_errors = false
+
+# Line exclusions
+ignore_missing_scripts = true
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+[tool.coverage.xml]
+output = "coverage.xml"
+
+# =============================================================================
+# Build System and Scripts
+# =============================================================================
+
+[project.scripts]
+quant-bench = "backtester.main:main"
+quant-backtest = "backtester.main:run_modular_backtest"
+
+[tool.hatch.build.targets.wheel]
+packages = ["backtester"]

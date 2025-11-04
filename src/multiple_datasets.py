@@ -1,5 +1,5 @@
 import optuna
-from run_sim import get_data, run_portfolio_simulation
+from run_sim import get_data, run_portfolio_simulation  # type: ignore[import-not-found]
 
 # List of datasets (tickers)
 datasets = ["SPY", "QQQ", "VTI"]

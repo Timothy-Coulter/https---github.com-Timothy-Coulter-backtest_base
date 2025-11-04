@@ -1,14 +1,17 @@
-import yfinance as yf
-import pandas as pd
 import numpy as np
 import optuna
 import matplotlib.pyplot as plt
 import multiprocessing
 import os
 from functools import partial
+from dotenv import load_dotenv
+from datetime import datetime
 
-from utils import get_data
-from run_sim import run_portfolio_simulation
+from utils import get_data  # type: ignore[import-not-found]
+from run_sim import run_portfolio_simulation  # type: ignore[import-not-found]
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 # Note, need to install postgressql if not installed: https://www.postgresql.org/download/windows/
@@ -37,8 +40,8 @@ def worker(study_name, storage_name, data):
 
 
 def run_parallel_grid_search(data):
-    N1 = 10
-    N2 = 4
+    N1 = 5
+    N2 = 2
 
     search_space = {
         "leverage_base": np.linspace(1.0, 10.0, N1).tolist(),
@@ -50,17 +53,35 @@ def run_parallel_grid_search(data):
         "take_profit_target": np.linspace(0.05, 0.20, N2).tolist(),
     }
 
-    storage_name = "postgresql://username:password@localhost/optuna_db"
+    # Get PostgreSQL credentials from environment variables
+    db_user = os.getenv("POSTGRES_USER", "postgres")
+    db_password = os.getenv("POSTGRES_PASSWORD")
+    db_host = os.getenv("POSTGRES_HOST", "localhost")
+    db_port = os.getenv("POSTGRES_PORT", "5432")
+    db_name = os.getenv("POSTGRES_DB", "optuna_db")
+    
+    if not db_password:
+        raise ValueError(
+            "POSTGRES_PASSWORD environment variable is not set. "
+            "Please create a .env file with your PostgreSQL credentials."
+        )
+    
+    storage_name = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
     sampler = optuna.samplers.GridSampler(search_space)
-    study_name = "portfolio_grid_search"
+    
+    # Create unique study name with timestamp (YYMMDD_HHMM)
+    timestamp = datetime.now().strftime("%y%m%d_%H%M")
+    study_name = f"portfolio_grid_search_{timestamp}"
+    
+    print(f"Creating new study: {study_name}")
 
-    # Create or load the shared study
+    # Create a new study (load_if_exists=False ensures fresh study each run)
     study = optuna.create_study(
         sampler=sampler,
         direction="maximize",
         study_name=study_name,
         storage=storage_name,
-        load_if_exists=True,
+        load_if_exists=False,
     )
 
     num_workers = os.cpu_count()
