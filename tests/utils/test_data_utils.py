@@ -10,7 +10,7 @@ from backtester.utils.data_utils import DataUtils
 class TestDataUtils:
     """Test suite for DataUtils class."""
 
-    def test_ohlc_validation(self):
+    def test_ohlc_validation(self) -> None:
         """Test OHLC data validation."""
         validator = DataUtils()
 
@@ -44,7 +44,7 @@ class TestDataUtils:
         assert is_valid is False
         assert len(errors) > 0
 
-    def test_price_movement_analysis(self):
+    def test_price_movement_analysis(self) -> None:
         """Test price movement analysis."""
         analyzer = DataUtils()
 
@@ -60,7 +60,7 @@ class TestDataUtils:
         assert analysis['trend'] in ['uptrend', 'downtrend', 'sideways']
         assert analysis['volatility'] >= 0
 
-    def test_data_cleaning(self):
+    def test_data_cleaning(self) -> None:
         """Test data cleaning functionality."""
         cleaner = DataUtils()
 
@@ -80,7 +80,7 @@ class TestDataUtils:
         cleaned_outliers = cleaner.remove_outliers(dirty_data, columns=['Close'], method='iqr')
         assert 1000 not in cleaned_outliers['Close'].values
 
-    def test_data_alignment(self):
+    def test_data_alignment(self) -> None:
         """Test data alignment across different timeframes."""
         aligner = DataUtils()
 
@@ -108,7 +108,7 @@ class TestDataUtils:
         assert 'Close' in resampled.columns
         assert 'Volume' in resampled.columns
 
-    def test_correlation_analysis(self):
+    def test_correlation_analysis(self) -> None:
         """Test correlation analysis between assets."""
         analyzer = DataUtils()
 
@@ -127,7 +127,7 @@ class TestDataUtils:
         assert correlation_matrix.loc['SPY', 'SPY'] == 1.0  # Self-correlation
         assert abs(correlation_matrix.loc['SPY', 'AAPL']) > 0  # Should be correlated
 
-    def test_data_synchronization(self):
+    def test_data_synchronization(self) -> None:
         """Test data synchronization across different sources."""
         synchronizer = DataUtils()
 
@@ -152,7 +152,7 @@ class TestDataUtils:
         assert len(synchronized.columns) == 4  # Two datasets, each with Close and Volume
         assert synchronized.index.equals(data1.index.intersection(data2.index))
 
-    def test_fill_missing_values_invalid_method(self):
+    def test_fill_missing_values_invalid_method(self) -> None:
         """Test fill_missing_values with invalid method."""
         cleaner = DataUtils()
 
@@ -161,7 +161,7 @@ class TestDataUtils:
         with pytest.raises(ValueError, match="Unknown fill method"):
             cleaner.fill_missing_values(data, method='invalid_method')
 
-    def test_remove_outliers_invalid_method(self):
+    def test_remove_outliers_invalid_method(self) -> None:
         """Test remove_outliers with invalid method."""
         cleaner = DataUtils()
 
@@ -173,7 +173,7 @@ class TestDataUtils:
         # Should return the original data unchanged for unknown methods
         assert len(result) <= len(data)
 
-    def test_remove_outliers_nonexistent_column(self):
+    def test_remove_outliers_nonexistent_column(self) -> None:
         """Test remove_outliers with nonexistent column."""
         cleaner = DataUtils()
 
@@ -183,7 +183,7 @@ class TestDataUtils:
         result = cleaner.remove_outliers(data, columns=['B'], method='iqr')
         pd.testing.assert_frame_equal(result, data)
 
-    def test_empty_data_validation(self):
+    def test_empty_data_validation(self) -> None:
         """Test validation with empty data."""
         validator = DataUtils()
 
@@ -193,7 +193,7 @@ class TestDataUtils:
         assert is_valid is False
         assert len(errors) > 0
 
-    def test_synchronize_empty_list(self):
+    def test_synchronize_empty_list(self) -> None:
         """Test synchronize_data with empty list."""
         synchronizer = DataUtils()
 

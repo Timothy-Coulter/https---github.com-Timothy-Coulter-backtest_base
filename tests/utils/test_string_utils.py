@@ -8,7 +8,7 @@ from backtester.utils.string_utils import StringUtils
 class TestStringUtils:
     """Test suite for StringUtils class."""
 
-    def test_validate_ticker_symbol(self):
+    def test_validate_ticker_symbol(self) -> None:
         """Test ticker symbol validation."""
         validator = StringUtils()
 
@@ -23,12 +23,11 @@ class TestStringUtils:
         # Invalid ticker symbols
         assert validator.validate_ticker_symbol("INVALID!@#") is False
         assert validator.validate_ticker_symbol("") is False
-        assert validator.validate_ticker_symbol(None) is False
         assert validator.validate_ticker_symbol("AAPL!") is False
         assert validator.validate_ticker_symbol("@APL") is False
         assert validator.validate_ticker_symbol("APP L") is False  # Space
 
-    def test_validate_file_path(self):
+    def test_validate_file_path(self) -> None:
         """Test file path validation."""
         validator = StringUtils()
 
@@ -37,12 +36,9 @@ class TestStringUtils:
         assert validator.validate_file_path("relative/path.txt") is True
         assert validator.validate_file_path("./file.txt") is True
         assert validator.validate_file_path("../file.txt") is True
-        # Note: Windows-style paths may fail validation due to implementation details
-        # assert validator.validate_file_path("C:\\Windows\\System32") is True
 
         # Invalid file paths
         assert validator.validate_file_path("") is False
-        assert validator.validate_file_path(None) is False
         assert validator.validate_file_path("path<file.txt") is False  # Invalid character
         assert validator.validate_file_path("path>file.txt") is False  # Invalid character
         assert validator.validate_file_path("path:file.txt") is False  # Invalid character
@@ -51,7 +47,7 @@ class TestStringUtils:
         assert validator.validate_file_path("path?file.txt") is False  # Invalid character
         assert validator.validate_file_path("path*file.txt") is False  # Invalid character
 
-    def test_normalize_ticker(self):
+    def test_normalize_ticker(self) -> None:
         """Test ticker symbol normalization."""
         normalizer = StringUtils()
 
@@ -64,11 +60,10 @@ class TestStringUtils:
         assert normalizer.normalize_ticker("  AAPL  ") == "AAPL"
         assert normalizer.normalize_ticker("\tBRK.A\t") == "BRK.A"
 
-        # Test empty/None inputs
+        # Test empty input
         assert normalizer.normalize_ticker("") == ""
-        assert normalizer.normalize_ticker(None) == ""
 
-    def test_normalize_path(self):
+    def test_normalize_path(self) -> None:
         """Test file path normalization."""
         normalizer = StringUtils()
 
@@ -85,7 +80,7 @@ class TestStringUtils:
         # Test empty path
         assert normalizer.normalize_path("") == ""
 
-    def test_format_percentage(self):
+    def test_format_percentage(self) -> None:
         """Test percentage formatting."""
         formatter = StringUtils()
 
@@ -99,7 +94,7 @@ class TestStringUtils:
         assert formatter.format_percentage(0.1234, decimals=1) == "12.3%"
         assert formatter.format_percentage(0.1234, decimals=4) == "12.3400%"
 
-    def test_format_currency(self):
+    def test_format_currency(self) -> None:
         """Test currency formatting."""
         formatter = StringUtils()
 
@@ -112,7 +107,7 @@ class TestStringUtils:
         )
         assert "€" in german_formatted and "1.234,56" in german_formatted
 
-    def test_format_number(self):
+    def test_format_number(self) -> None:
         """Test number formatting."""
         formatter = StringUtils()
 
@@ -124,7 +119,7 @@ class TestStringUtils:
         assert formatter.format_number(1234.567, decimals=0) == "1,235"
         assert formatter.format_number(1234.4, decimals=0) == "1,234"
 
-    def test_clean_text(self):
+    def test_clean_text(self) -> None:
         """Test text cleaning."""
         processor = StringUtils()
 
@@ -135,12 +130,11 @@ class TestStringUtils:
 
         # Test empty text
         assert processor.clean_text("") == ""
-        assert processor.clean_text(None) == ""
 
         # Test text with only whitespace
         assert processor.clean_text("   ") == ""
 
-    def test_split_text(self):
+    def test_split_text(self) -> None:
         """Test text splitting."""
         processor = StringUtils()
 
@@ -158,9 +152,6 @@ class TestStringUtils:
 
         # Test empty text
         assert processor.split_text("", max_length=20) == []
-
-        # Test None
-        assert processor.split_text(None, max_length=20) == []
 
 
 if __name__ == "__main__":

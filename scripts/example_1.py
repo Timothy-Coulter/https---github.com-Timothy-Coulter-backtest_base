@@ -4,6 +4,7 @@ This script provides a simple test of the modular backtester functionality.
 """
 
 import sys
+from typing import Any
 
 sys.path.append('..')
 from backtester.main import get_data, run_modular_backtest
@@ -15,7 +16,7 @@ print(f'Loaded {len(data)} records')
 
 # Test modular system
 print('Testing modular backtester...')
-result = run_modular_backtest(
+result: dict[str, Any] = run_modular_backtest(
     data=data,
     leverage_base=2.0,
     leverage_alpha=3.0,

@@ -11,7 +11,7 @@ from backtester.utils.cache_utils import CacheUtils
 class TestCacheUtils:
     """Test suite for CacheUtils class."""
 
-    def test_memory_cache(self):
+    def test_memory_cache(self) -> None:
         """Test in-memory caching."""
         cache = CacheUtils(memory_cache=True)
 
@@ -26,7 +26,7 @@ class TestCacheUtils:
         # Test expiration (simplified - would need actual time passing in real test)
         assert cache.get('key2', force_check=False) == 'value2'
 
-    def test_file_cache(self):
+    def test_file_cache(self) -> None:
         """Test file-based caching."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             cache = CacheUtils(cache_dir=tmp_dir)
@@ -40,7 +40,7 @@ class TestCacheUtils:
             cache_files = os.listdir(tmp_dir)
             assert len(cache_files) > 0
 
-    def test_cache_invalidation(self):
+    def test_cache_invalidation(self) -> None:
         """Test cache invalidation."""
         cache = CacheUtils()
 
@@ -60,7 +60,7 @@ class TestCacheUtils:
         assert cache.get('key1') is None
         assert cache.get('key3') is None
 
-    def test_cache_statistics(self):
+    def test_cache_statistics(self) -> None:
         """Test cache statistics."""
         cache = CacheUtils()
 
@@ -77,7 +77,7 @@ class TestCacheUtils:
         assert stats['hits'] >= 1
         assert stats['misses'] >= 1
 
-    def test_cache_key_generation(self):
+    def test_cache_key_generation(self) -> None:
         """Test cache key generation."""
         cache = CacheUtils()
 
@@ -88,7 +88,7 @@ class TestCacheUtils:
         assert len(key1) == 32  # MD5 hash length
         assert key1 == key2  # Same key should produce same hash
 
-    def test_cache_file_path(self):
+    def test_cache_file_path(self) -> None:
         """Test cache file path generation."""
         cache = CacheUtils(cache_dir='/tmp/cache')
 
@@ -99,7 +99,7 @@ class TestCacheUtils:
         assert 'cache_test_key_hash.pkl' in file_path
         assert 'cache' in file_path and 'test_key_hash' in file_path
 
-    def test_memory_cache_limit(self):
+    def test_memory_cache_limit(self) -> None:
         """Test memory cache size limit."""
         cache = CacheUtils(memory_cache=True, max_memory_items=2)
 
@@ -112,7 +112,7 @@ class TestCacheUtils:
         stats = cache.get_stats()
         assert stats['memory_cache_size'] <= 2
 
-    def test_ttl_expiration(self):
+    def test_ttl_expiration(self) -> None:
         """Test TTL expiration functionality."""
         cache = CacheUtils(memory_cache=True)
 
@@ -125,7 +125,7 @@ class TestCacheUtils:
         # Note: Actual TTL testing would require time.sleep()
         # In practice, this test validates the TTL logic exists
 
-    def test_error_handling(self):
+    def test_error_handling(self) -> None:
         """Test error handling in cache operations."""
         cache = CacheUtils(cache_dir='/nonexistent/path')
 

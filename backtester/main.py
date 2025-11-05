@@ -7,7 +7,6 @@ the original codebase while providing a modern, modular architecture.
 
 import argparse
 import warnings
-from collections.abc import Callable
 from datetime import datetime
 
 # Import original modules for compatibility
@@ -22,21 +21,8 @@ from backtester.core.config import BacktesterConfig, set_config
 from backtester.core.logger import get_backtester_logger
 from backtester.data.data_handler import DataHandler, get_data
 
-try:
-    from src.run_sim import run_portfolio_simulation as _original_run_sim
-    from src.utils import get_data as _original_get_data_util
-
-    _run_sim_available = True
-except ImportError:
-    _run_sim_available = False
-
-# Set variables based on import success
-if _run_sim_available:
-    run_portfolio_simulation: Callable[..., Any] | Any = _original_run_sim
-    src_get_data: Callable[..., Any] | Any = _original_get_data_util
-else:
-    run_portfolio_simulation = None
-    src_get_data = None
+run_portfolio_simulation = None
+src_get_data = None
 
 warnings.filterwarnings('ignore')
 
@@ -239,17 +225,13 @@ def compare_systems(data: pd.DataFrame, params: dict[str, float]) -> dict[str, A
     Returns:
         Comparison results
     """
-    # Run original system (if available)
-    if run_portfolio_simulation is not None:
-        original_result = run_portfolio_simulation(data=data, **params)
-    else:
-        # Mock result for when original system isn't available
-        original_result = {
-            'total_return': 0.0,
-            'max_drawdown': 0.0,
-            'sharpe_ratio': 0.0,
-            'portfolio_values': [100.0, 100.0],
-        }
+    # Mock result for when original system isn't available
+    original_result: dict[str, Any] = {
+        'total_return': 0.0,
+        'max_drawdown': 0.0,
+        'sharpe_ratio': 0.0,
+        'portfolio_values': [100.0, 100.0],
+    }
 
     # Run modular system
     modular_result = run_modular_backtest(data=data, **params)
@@ -860,6 +842,7 @@ class BacktesterApp:
 
 __all__ = [
     'DataHandler',
+    'get_data',
     'ModularBacktester',
     'StrategyFactory',
     'PortfolioFactory',

@@ -9,6 +9,8 @@ import gc
 import multiprocessing
 import threading
 import time
+from collections.abc import Iterator
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -24,8 +26,8 @@ class TestLargeDatasetPerformance:
 
     @pytest.mark.slow
     def test_large_dataset_processing_performance(
-        self, large_dataset, integration_test_config, performance_monitor
-    ):
+        self, large_dataset: Any, integration_test_config: Any, performance_monitor: Any
+    ) -> None:
         """Test performance with large datasets (5+ years of daily data)."""
         engine = BacktestEngine(integration_test_config)
 
@@ -64,7 +66,7 @@ class TestLargeDatasetPerformance:
         )
 
     @pytest.mark.slow
-    def test_memory_usage_scalability(self, integration_test_config):
+    def test_memory_usage_scalability(self, integration_test_config: Any) -> None:
         """Test memory usage scalability with increasing data sizes."""
         BacktestEngine(integration_test_config)
 
@@ -135,7 +137,9 @@ class TestLargeDatasetPerformance:
         print(f"Processing times: {[f'{pt:.2f}s' for pt in processing_times]}")
 
     @pytest.mark.slow
-    def test_data_processing_chunking_performance(self, large_dataset, integration_test_config):
+    def test_data_processing_chunking_performance(
+        self, large_dataset: Any, integration_test_config: Any
+    ) -> None:
         """Test performance with chunked data processing for large datasets."""
         BacktestEngine(integration_test_config)
 
@@ -163,7 +167,7 @@ class TestLargeDatasetPerformance:
         sequential_time = time.time() - start_time
 
         # Test concurrent processing with smaller chunks
-        def process_chunk(chunk_data, chunk_id):
+        def process_chunk(chunk_data: Any, chunk_id: int) -> Any:
             """Process a single chunk."""
             engine_chunk = BacktestEngine(integration_test_config)
             engine_chunk.current_data = chunk_data.copy()
@@ -206,7 +210,7 @@ class TestHighFrequencyDataProcessing:
     """Test intraday and high-frequency data processing capabilities."""
 
     @pytest.mark.slow
-    def test_minute_level_data_processing(self, integration_test_config):
+    def test_minute_level_data_processing(self, integration_test_config: Any) -> None:
         """Test processing of minute-level intraday data."""
         # Generate minute-level data for one day
         dates = pd.date_range('2020-01-01 09:30:00', '2020-01-01 16:00:00', freq='1min')
@@ -256,7 +260,7 @@ class TestHighFrequencyDataProcessing:
         print(f"Minute-level processing: {n_periods} periods in {processing_time:.2f}s")
 
     @pytest.mark.slow
-    def test_tick_level_data_handling(self, integration_test_config):
+    def test_tick_level_data_handling(self, integration_test_config: Any) -> None:
         """Test handling of tick-level market data."""
         # Generate tick data (1000 ticks)
         dates = pd.date_range('2020-01-01 09:30:00', periods=1000, freq='1s')
@@ -302,12 +306,12 @@ class TestHighFrequencyDataProcessing:
             # This is acceptable - not all systems need tick-level support
 
     @pytest.mark.slow
-    def test_real_time_simulation_performance(self, integration_test_config):
+    def test_real_time_simulation_performance(self, integration_test_config: Any) -> None:
         """Test real-time simulation performance with streaming data."""
         engine = BacktestEngine(integration_test_config)
 
         # Simulate real-time data stream
-        def data_stream_generator(duration_seconds=10):
+        def data_stream_generator(duration_seconds: int = 10) -> Iterator[Any]:
             """Generate data stream for testing."""
             start_time = time.time()
             count = 0
@@ -368,10 +372,12 @@ class TestConcurrentOperations:
     """Test multiple concurrent backtest executions and resource sharing."""
 
     @pytest.mark.slow
-    def test_parallel_backtest_execution(self, sample_market_data, integration_test_config):
+    def test_parallel_backtest_execution(
+        self, sample_market_data: Any, integration_test_config: Any
+    ) -> None:
         """Test multiple parallel backtest executions."""
 
-        def run_single_backtest(data_subset, test_id):
+        def run_single_backtest(data_subset: Any, test_id: int) -> dict[str, Any]:
             """Run a single backtest in a separate process."""
             engine = BacktestEngine(integration_test_config)
             engine.current_data = data_subset.copy()
@@ -425,19 +431,20 @@ class TestConcurrentOperations:
         print(f"Success rate: {len(successful_backtests)}/{len(results)}")
 
     @pytest.mark.slow
-    def test_resource_sharing_isolation(self, integration_test_config):
+    def test_resource_sharing_isolation(self, integration_test_config: Any) -> None:
         """Test resource sharing and isolation in concurrent operations."""
         # Test shared resource access patterns
-        shared_data = None
+        shared_data: dict[str, Any] = {}
         lock = threading.Lock()
 
-        def access_shared_resource(thread_id):
+        def access_shared_resource(thread_id: int) -> dict[str, Any]:
             """Access shared resource with proper locking."""
             with lock:
                 # Simulate shared resource access
                 nonlocal shared_data
-                if shared_data is None:
-                    shared_data = {'initialized': True, 'threads_accessed': []}
+                if 'initialized' not in shared_data:
+                    shared_data['initialized'] = True
+                    shared_data['threads_accessed'] = []
 
                 shared_data['threads_accessed'].append(thread_id)
 
@@ -467,19 +474,19 @@ class TestConcurrentOperations:
             assert result['access_successful'], "All accesses should be successful"
 
         # Verify shared resource was accessed correctly
-        assert shared_data is not None, "Shared resource should be initialized"
+        assert 'initialized' in shared_data, "Shared resource should be initialized"
         assert len(shared_data['threads_accessed']) == 5, "All threads should access resource"
 
         print(f"Resource sharing test: {len(results)} threads in {total_time:.2f}s")
 
     @pytest.mark.slow
-    def test_system_stability_under_load(self, integration_test_config):
+    def test_system_stability_under_load(self, integration_test_config: Any) -> None:
         """Test system stability under concurrent load."""
         # Test system behavior under high concurrent load
-        results = []
-        errors = []
+        results: list[dict[str, Any]] = []
+        errors: list[str] = []
 
-        def simulate_backtest_load(load_id):
+        def simulate_backtest_load(load_id: int) -> dict[str, Any]:
             """Simulate backtest execution under load."""
             try:
                 # Create large dataset for stress testing
@@ -564,7 +571,7 @@ class TestSystemResourceUsage:
     """Test system resource usage monitoring and optimization."""
 
     @pytest.mark.slow
-    def test_cpu_usage_monitoring(self, integration_test_config):
+    def test_cpu_usage_monitoring(self, integration_test_config: Any) -> None:
         """Test CPU usage monitoring during backtest execution."""
         engine = BacktestEngine(integration_test_config)
 
@@ -581,7 +588,7 @@ class TestSystemResourceUsage:
         cpu_samples = []
         memory_samples = []
 
-        def monitor_resources():
+        def monitor_resources() -> None:
             """Monitor system resources during execution."""
             while time.time() - start_time < 10:  # Monitor for up to 10 seconds
                 cpu_percent = process.cpu_percent()
@@ -597,7 +604,7 @@ class TestSystemResourceUsage:
         monitor_thread.start()
 
         # Run actual backtest
-        engine.current_data = sample_market_data.copy()
+        engine.current_data = sample_market_data.copy()  # type: ignore[attr-defined]
         engine.run_backtest()
 
         # Stop monitoring
@@ -628,12 +635,12 @@ class TestSystemResourceUsage:
             print(f"Memory usage: avg={avg_memory:.1f}MB, peak={peak_memory:.1f}MB")
 
     @pytest.mark.slow
-    def test_memory_optimization_strategies(self, integration_test_config):
+    def test_memory_optimization_strategies(self, integration_test_config: Any) -> None:
         """Test memory optimization strategies for large datasets."""
         # Test different memory optimization approaches
 
         # Approach 1: Process data in chunks
-        def process_in_chunks(data, chunk_size=252):
+        def process_in_chunks(data: Any, chunk_size: int = 252) -> list[Any]:
             """Process large data in memory-efficient chunks."""
             results = []
 
@@ -657,7 +664,7 @@ class TestSystemResourceUsage:
             return results
 
         # Test with large dataset
-        large_data = large_dataset.copy()
+        large_data = large_dataset.copy()  # type: ignore[attr-defined]
 
         start_time = time.time()
         chunk_results = process_in_chunks(large_data)
@@ -674,7 +681,7 @@ class TestSystemResourceUsage:
         print(f"Memory after chunks: {memory_after_chunks:.1f}MB")
 
         # Approach 2: Process data incrementally
-        def process_incrementally(data, increment_size=50):
+        def process_incrementally(data: Any, increment_size: int = 50) -> list[Any]:
             """Process data incrementally without storing full results."""
             final_results = []
 
@@ -727,13 +734,12 @@ class TestSystemResourceUsage:
         ), "Incremental processing memory usage should be reasonable"
 
 
-# Import required fixtures
 # This will be resolved when the test runs with proper fixtures
-def sample_market_data():
+def sample_market_data() -> None:
     """Placeholder for sample_market_data fixture."""
     pass
 
 
-def large_dataset():
+def large_dataset() -> None:
     """Placeholder for large_dataset fixture."""
     pass

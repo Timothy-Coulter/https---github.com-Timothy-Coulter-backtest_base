@@ -5,6 +5,7 @@ all components of the trading system including data loading, strategy execution,
 portfolio management, and performance calculation.
 """
 
+from typing import Any
 from unittest.mock import Mock, patch
 
 import pandas as pd
@@ -20,7 +21,7 @@ except ImportError as e:
 class TestBacktestEngine:
     """Test suite for the BacktestEngine class."""
 
-    def test_initialization(self, mock_config):
+    def test_initialization(self, mock_config: Mock) -> None:
         """Test that BacktestEngine initializes correctly."""
         engine = BacktestEngine(config=mock_config)
 
@@ -33,7 +34,7 @@ class TestBacktestEngine:
         assert engine.performance_tracker is None
         assert engine.performance_analyzer is not None
 
-    def test_load_data_success(self, test_data):
+    def test_load_data_success(self, test_data: pd.DataFrame) -> None:
         """Test successful data loading."""
         with patch.object(BacktestEngine, 'load_data') as mock_load:
             # Create engine with mocked load_data
@@ -44,7 +45,7 @@ class TestBacktestEngine:
             assert result.equals(test_data)
             mock_load.assert_called_once_with('SPY', '2020-01-01', '2024-01-01', '1mo')
 
-    def test_load_data_failure(self):
+    def test_load_data_failure(self) -> None:
         """Test data loading failure handling."""
         with patch.object(BacktestEngine, 'load_data') as mock_load:
             mock_load.side_effect = Exception("Failed to load data")
@@ -54,7 +55,7 @@ class TestBacktestEngine:
             with pytest.raises(Exception, match="Failed to load data"):
                 engine.load_data('INVALID', '2020-01-01', '2024-01-01', '1mo')
 
-    def test_run_backtest_success(self, test_data, mock_config):
+    def test_run_backtest_success(self, test_data: pd.DataFrame, mock_config: Mock) -> None:
         """Test successful backtest execution."""
         # Create mock portfolio with proper attributes
         mock_portfolio_obj = Mock()
@@ -68,7 +69,9 @@ class TestBacktestEngine:
         mock_portfolio_obj.reset = Mock()
 
         # Create a side effect that also sets current_portfolio
-        def mock_create_portfolio_fn(self, portfolio_params=None):
+        def mock_create_portfolio_fn(
+            self: BacktestEngine, portfolio_params: dict[str, Any] | None = None
+        ) -> Mock:
             self.current_portfolio = mock_portfolio_obj
             self.portfolio = mock_portfolio_obj
             return mock_portfolio_obj
@@ -105,7 +108,7 @@ class TestBacktestEngine:
             assert 'portfolio_values' in result or 'trades' in result
             assert 'total_return' in result['performance']
 
-    def test_run_backtest_with_missing_data(self, mock_config):
+    def test_run_backtest_with_missing_data(self, mock_config: Mock) -> None:
         """Test backtest handling of missing or insufficient data."""
         with patch.object(BacktestEngine, 'load_data') as mock_load:
             mock_load.return_value = pd.DataFrame()  # Empty data
@@ -116,7 +119,7 @@ class TestBacktestEngine:
             with pytest.raises(ValueError, match="Insufficient data"):
                 engine.run_backtest('SPY', '2020-01-01', '2024-01-01', '1mo')
 
-    def test_run_strategy_backtest(self, test_data, mock_config):
+    def test_run_strategy_backtest(self, test_data: pd.DataFrame, mock_config: Mock) -> None:
         """Test the strategy backtest execution."""
         engine = BacktestEngine(config=mock_config)
         engine.current_data = test_data  # Set current_data
@@ -134,7 +137,7 @@ class TestBacktestEngine:
             assert isinstance(result, dict)
             assert 'performance' in result or 'data' in result
 
-    def test_calculate_performance(self, mock_config):
+    def test_calculate_performance(self, mock_config: Mock) -> None:
         """Test performance calculation."""
         engine = BacktestEngine(config=mock_config)
 
@@ -160,7 +163,7 @@ class TestBacktestEngine:
         assert 'win_rate' in result
         assert isinstance(result['total_return'], float)
 
-    def test_handle_exception_gracefully(self, test_data, mock_config):
+    def test_handle_exception_gracefully(self, test_data: pd.DataFrame, mock_config: Mock) -> None:
         """Test that exceptions are handled gracefully during backtesting."""
         with (
             patch.object(BacktestEngine, 'load_data') as mock_load,
@@ -175,7 +178,7 @@ class TestBacktestEngine:
             with pytest.raises(Exception, match="Strategy error"):
                 engine.run_backtest('SPY', '2020-01-01', '2024-01-01', '1mo')
 
-    def test_validate_config(self, mock_config):
+    def test_validate_config(self, mock_config: Mock) -> None:
         """Test configuration validation."""
         engine = BacktestEngine(config=mock_config)
 
@@ -187,7 +190,7 @@ class TestBacktestEngine:
         # This gets default config, so it should be valid
         assert engine_none._validate_config() is True
 
-    def test_get_status(self, test_data, mock_config):
+    def test_get_status(self, test_data: pd.DataFrame, mock_config: Mock) -> None:
         """Test getting backtest status information."""
         engine = BacktestEngine(config=mock_config)
 
@@ -206,7 +209,9 @@ class TestBacktestEngine:
             ("GOOGL", "2021-06-01", "2023-06-01", "1h"),
         ],
     )
-    def test_run_backtest_parameters(self, ticker, start_date, end_date, interval, mock_config):
+    def test_run_backtest_parameters(
+        self, ticker: str, start_date: str, end_date: str, interval: str, mock_config: Mock
+    ) -> None:
         """Test backtest with various parameter combinations."""
         test_data_small = pd.DataFrame(
             {
@@ -231,7 +236,9 @@ class TestBacktestEngine:
         mock_portfolio_obj.reset = Mock()
 
         # Create a side effect that also sets current_portfolio
-        def mock_create_portfolio_fn(self, portfolio_params=None):
+        def mock_create_portfolio_fn(
+            self: BacktestEngine, portfolio_params: dict[str, Any] | None = None
+        ) -> Mock:
             self.current_portfolio = mock_portfolio_obj
             self.portfolio = mock_portfolio_obj
             return mock_portfolio_obj
@@ -261,7 +268,7 @@ class TestBacktestEngine:
             assert 'performance' in result
             mock_load.assert_called_once_with(ticker, start_date, end_date, interval)
 
-    def test_memory_efficiency(self, test_data, mock_config):
+    def test_memory_efficiency(self, test_data: pd.DataFrame, mock_config: Mock) -> None:
         """Test that backtest runs efficiently with memory constraints."""
         # Test with larger dataset
         large_data = pd.concat([test_data] * 100)  # Simulate large dataset
@@ -278,7 +285,7 @@ class TestBacktestEngine:
         mock_portfolio_obj.reset = Mock()
 
         # Create a side effect that also sets current_portfolio
-        def mock_create_portfolio_fn(portfolio_params=None):
+        def mock_create_portfolio_fn(portfolio_params: dict[str, Any] | None = None) -> Mock:
             engine.current_portfolio = mock_portfolio_obj
             engine.portfolio = mock_portfolio_obj
             return mock_portfolio_obj
@@ -309,7 +316,7 @@ class TestBacktestEngine:
             assert result is not None
             assert 'performance' in result
 
-    def test_concurrent_safety(self, mock_config):
+    def test_concurrent_safety(self, mock_config: Mock) -> None:
         """Test that multiple engines can run safely."""
         engine1 = BacktestEngine(config=mock_config)
         engine2 = BacktestEngine(config=mock_config)

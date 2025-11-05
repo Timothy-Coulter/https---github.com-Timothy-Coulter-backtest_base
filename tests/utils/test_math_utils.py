@@ -10,7 +10,7 @@ from backtester.utils.math_utils import MathUtils
 class TestMathUtils:
     """Test suite for MathUtils class."""
 
-    def test_sma_calculation(self):
+    def test_sma_calculation(self) -> None:
         """Test Simple Moving Average calculation."""
         prices = pd.Series([100, 101, 102, 103, 104, 105, 106, 107, 108, 109])
 
@@ -30,7 +30,7 @@ class TestMathUtils:
         expected_sma_3_2 = (100 + 101 + 102) / 3
         assert abs(sma_3.iloc[2] - expected_sma_3_2) < 0.001
 
-    def test_ema_calculation(self):
+    def test_ema_calculation(self) -> None:
         """Test Exponential Moving Average calculation."""
         prices = pd.Series([100, 101, 102, 103, 104, 105, 106, 107, 108, 109])
 
@@ -46,7 +46,7 @@ class TestMathUtils:
         # EMA calculation uses smoothing factor, so we expect some difference
         assert abs(ema_3.iloc[2] - expected_first_ema) < 0.5  # More lenient tolerance
 
-    def test_rsi_calculation(self):
+    def test_rsi_calculation(self) -> None:
         """Test RSI (Relative Strength Index) calculation."""
         prices = pd.Series(
             [
@@ -85,7 +85,7 @@ class TestMathUtils:
         assert pd.isna(rsi_14.iloc[:13]).all()
         assert not pd.isna(rsi_14.iloc[13])
 
-    def test_bollinger_bands_calculation(self):
+    def test_bollinger_bands_calculation(self) -> None:
         """Test Bollinger Bands calculation."""
         prices = pd.Series(
             [
@@ -128,7 +128,7 @@ class TestMathUtils:
         assert (upper_valid >= middle_valid).all()
         assert (middle_valid >= lower_valid).all()
 
-    def test_macd_calculation(self):
+    def test_macd_calculation(self) -> None:
         """Test MACD calculation."""
         prices = pd.Series(np.random.randn(50).cumsum() + 100)
 
@@ -143,7 +143,7 @@ class TestMathUtils:
         expected_histogram.name = 'histogram'  # Set the name to match
         pd.testing.assert_series_equal(macd['histogram'], expected_histogram, rtol=1e-10)
 
-    def test_statistical_functions(self):
+    def test_statistical_functions(self) -> None:
         """Test statistical utility functions."""
         data = pd.Series([100, 101, 102, 103, 104, 105, 106, 107, 108, 109])
 
@@ -160,7 +160,7 @@ class TestMathUtils:
         volatility = MathUtils.calculate_annualized_volatility(returns)
         assert volatility >= 0
 
-    def test_safe_divide(self):
+    def test_safe_divide(self) -> None:
         """Test safe division function."""
         assert MathUtils.safe_divide(10, 2) == 5.0
         assert MathUtils.safe_divide(10, 0) == 0.0
@@ -168,7 +168,7 @@ class TestMathUtils:
         assert MathUtils.safe_divide(np.inf, 1) == np.inf
         assert MathUtils.safe_divide(10, np.inf) == 0.0
 
-    def test_rolling_window_operations(self):
+    def test_rolling_window_operations(self) -> None:
         """Test rolling window operations."""
         data = pd.Series([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
 
@@ -182,7 +182,7 @@ class TestMathUtils:
         expected_sum_2 = 1 + 2 + 3  # 6
         assert rolling_sum.iloc[2] == expected_sum_2
 
-    def test_interpolation_functions(self):
+    def test_interpolation_functions(self) -> None:
         """Test data interpolation functions."""
         data_with_gaps = pd.Series([100, np.nan, 102, np.nan, 104, np.nan, 106])
 
@@ -196,21 +196,21 @@ class TestMathUtils:
         assert not interpolated_ffill.isna().any()
         assert interpolated_ffill.iloc[1] == 100  # Forward filled
 
-    def test_rolling_window_invalid_operation(self):
+    def test_rolling_window_invalid_operation(self) -> None:
         """Test rolling_window with invalid operation."""
         data = pd.Series([1, 2, 3, 4, 5])
 
         with pytest.raises(ValueError, match="Unknown operation"):
             MathUtils.rolling_window(data, window=3, operation='invalid')
 
-    def test_interpolate_missing_invalid_method(self):
+    def test_interpolate_missing_invalid_method(self) -> None:
         """Test interpolate_missing with invalid method."""
         data = pd.Series([1, np.nan, 3, 4])
 
         with pytest.raises(ValueError, match="Unknown interpolation method"):
             MathUtils.interpolate_missing(data, method='invalid')
 
-    def test_empty_series_calculations(self):
+    def test_empty_series_calculations(self) -> None:
         """Test calculations with empty series."""
         empty_series = pd.Series([], dtype=float)
 
@@ -221,7 +221,7 @@ class TestMathUtils:
         rsi = MathUtils.calculate_rsi(empty_series, period=14)
         assert len(rsi) == 0
 
-    def test_single_value_series(self):
+    def test_single_value_series(self) -> None:
         """Test calculations with single value series."""
         single_value = pd.Series([100.0])
 
@@ -229,7 +229,7 @@ class TestMathUtils:
         assert len(sma) == 1
         assert pd.isna(sma.iloc[0])
 
-    def test_rsi_edge_cases(self):
+    def test_rsi_edge_cases(self) -> None:
         """Test RSI calculation with edge cases."""
         # Test with constant prices (no change)
         constant_prices = pd.Series([100] * 30)
@@ -245,7 +245,7 @@ class TestMathUtils:
         valid_rsi = rsi.dropna()
         assert (valid_rsi >= 0).all() and (valid_rsi <= 100).all()
 
-    def test_safe_divide_edge_cases(self):
+    def test_safe_divide_edge_cases(self) -> None:
         """Test safe division with edge cases."""
         # Test zero division
         assert MathUtils.safe_divide(0, 0) == 0.0

@@ -180,65 +180,110 @@ class ParameterSpace:
         """
         params = {}
         for param_def in self._parameters.values():
-            if param_def.param_type == 'float':
-                if param_def.step is not None:
-                    params[param_def.name] = trial.suggest_float(
-                        param_def.name,
-                        param_def.low,  # type: ignore[arg-type]
-                        param_def.high,  # type: ignore[arg-type]
-                        step=param_def.step,
-                    )
-                elif param_def.q is not None:
-                    params[param_def.name] = trial.suggest_float(
-                        param_def.name,
-                        float(param_def.low),  # type: ignore[arg-type]
-                        float(param_def.high),  # type: ignore[arg-type]
-                        q=param_def.q,
-                    )
-                else:
-                    params[param_def.name] = trial.suggest_float(
-                        param_def.name,
-                        param_def.low,  # type: ignore[arg-type]
-                        param_def.high,  # type: ignore[arg-type]
-                        log=param_def.log,
-                    )
-            elif param_def.param_type == 'int':
-                if param_def.step is not None:
-                    params[param_def.name] = trial.suggest_int(
-                        param_def.name,
-                        int(param_def.low),  # type: ignore[arg-type]
-                        int(param_def.high),  # type: ignore[arg-type]
-                        step=int(param_def.step),
-                    )
-                else:
-                    params[param_def.name] = trial.suggest_int(
-                        param_def.name,
-                        param_def.low,  # type: ignore[arg-type]
-                        param_def.high,  # type: ignore[arg-type]
-                    )
-            elif param_def.param_type == 'categorical':
-                params[param_def.name] = trial.suggest_categorical(
-                    param_def.name,
-                    param_def.choices,  # type: ignore[arg-type]
-                )
-            elif param_def.param_type == 'loguniform':
-                if param_def.q is not None:
-                    params[param_def.name] = trial.suggest_float(
-                        param_def.name,
-                        float(param_def.low),  # type: ignore[arg-type]
-                        float(param_def.high),  # type: ignore[arg-type]
-                        log=True,
-                        q=param_def.q,
-                    )
-                else:
-                    params[param_def.name] = trial.suggest_float(
-                        param_def.name,
-                        float(param_def.low),  # type: ignore[arg-type]
-                        float(param_def.high),  # type: ignore[arg-type]
-                        log=True,
-                    )
+            value = self._suggest_param_value(trial, param_def)
+            if value is not None:
+                params[param_def.name] = value
 
         return params
+
+    def _suggest_param_value(
+        self, trial: optuna.Trial, param_def: ParameterDefinition
+    ) -> float | int | Any:
+        """Suggest a single parameter value for an Optuna trial.
+
+        Args:
+            trial: Optuna trial object
+            param_def: Parameter definition
+
+        Returns:
+            Suggested parameter value
+        """
+        if param_def.param_type == 'float':
+            return self._suggest_float_param(trial, param_def)
+        elif param_def.param_type == 'int':
+            return self._suggest_int_param(trial, param_def)
+        elif param_def.param_type == 'categorical':
+            return trial.suggest_categorical(
+                param_def.name,
+                param_def.choices,  # type: ignore[arg-type]
+            )
+        elif param_def.param_type == 'loguniform':
+            return self._suggest_loguniform_param(trial, param_def)
+        return None
+
+    def _suggest_float_param(self, trial: optuna.Trial, param_def: ParameterDefinition) -> float:
+        """Suggest a float parameter value.
+
+        Args:
+            trial: Optuna trial object
+            param_def: Parameter definition
+
+        Returns:
+            Suggested float value
+        """
+        if param_def.step is not None:
+            return trial.suggest_float(
+                param_def.name,
+                param_def.low,  # type: ignore[arg-type]
+                param_def.high,  # type: ignore[arg-type]
+                step=param_def.step,
+            )
+        elif param_def.q is not None:
+            return trial.suggest_float(
+                param_def.name,
+                float(param_def.low),  # type: ignore[arg-type]
+                float(param_def.high),  # type: ignore[arg-type]
+            )
+        else:
+            return trial.suggest_float(
+                param_def.name,
+                float(param_def.low),  # type: ignore[arg-type]
+                float(param_def.high),  # type: ignore[arg-type]
+                log=param_def.log,
+            )
+
+    def _suggest_int_param(self, trial: optuna.Trial, param_def: ParameterDefinition) -> int:
+        """Suggest an integer parameter value.
+
+        Args:
+            trial: Optuna trial object
+            param_def: Parameter definition
+
+        Returns:
+            Suggested integer value
+        """
+        if param_def.step is not None:
+            return trial.suggest_int(
+                param_def.name,
+                int(param_def.low),  # type: ignore[arg-type]
+                int(param_def.high),  # type: ignore[arg-type]
+                step=int(param_def.step),
+            )
+        else:
+            return trial.suggest_int(
+                param_def.name,
+                param_def.low,  # type: ignore[arg-type]
+                param_def.high,  # type: ignore[arg-type]
+            )
+
+    def _suggest_loguniform_param(
+        self, trial: optuna.Trial, param_def: ParameterDefinition
+    ) -> float:
+        """Suggest a loguniform parameter value.
+
+        Args:
+            trial: Optuna trial object
+            param_def: Parameter definition
+
+        Returns:
+            Suggested loguniform value
+        """
+        return trial.suggest_float(
+            param_def.name,
+            float(param_def.low),  # type: ignore[arg-type]
+            float(param_def.high),  # type: ignore[arg-type]
+            log=True,
+        )
 
     def get_parameter_names(self) -> list[str]:
         """Get list of parameter names in the search space.
@@ -425,7 +470,7 @@ class OptimizationConfig:
                 "Grid sampler requires search space - use ParameterSpace.create_grid_space()"
             )
 
-        return sampler_class(**self.sampler_kwargs)
+        return sampler_class(**self.sampler_kwargs)  # type: ignore[no-any-return]
 
     def get_storage_url(self) -> str | None:
         """Get storage URL with defaults applied.

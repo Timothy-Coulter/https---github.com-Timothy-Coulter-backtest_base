@@ -210,6 +210,8 @@ def reset_config() -> None:
 class BacktestConfig:
     """Legacy BacktestConfig class for test compatibility."""
 
+    _test_invalid: bool = False  # Attribute for test compatibility
+
     def __init__(
         self,
         initial_capital: float = 1000.0,

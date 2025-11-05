@@ -10,7 +10,7 @@ from backtester.utils.format_utils import FormatUtils
 class TestFormatUtils:
     """Test suite for FormatUtils class."""
 
-    def test_currency_formatting(self):
+    def test_currency_formatting(self) -> None:
         """Test currency formatting."""
         formatter = FormatUtils()
 
@@ -28,7 +28,7 @@ class TestFormatUtils:
         # Test negative value
         assert formatter.currency(-1234.56) == "$-1,234.56"
 
-    def test_percentage_formatting(self):
+    def test_percentage_formatting(self) -> None:
         """Test percentage formatting."""
         formatter = FormatUtils()
 
@@ -46,7 +46,7 @@ class TestFormatUtils:
         # Test negative percentage
         assert formatter.percentage(-0.1234) == "-12.34%"
 
-    def test_number_formatting(self):
+    def test_number_formatting(self) -> None:
         """Test number formatting."""
         formatter = FormatUtils()
 
@@ -60,7 +60,7 @@ class TestFormatUtils:
         # Test negative numbers
         assert formatter.number(-1234567) == "-1,234,567"
 
-    def test_compact_number_formatting(self):
+    def test_compact_number_formatting(self) -> None:
         """Test compact number formatting."""
         formatter = FormatUtils()
 
@@ -79,7 +79,7 @@ class TestFormatUtils:
         assert formatter.compact_number(1.23) == "1.23"
         assert formatter.compact_number(0) == "0.00"
 
-    def test_date_formatting(self):
+    def test_date_formatting(self) -> None:
         """Test date formatting."""
         formatter = FormatUtils()
 
@@ -94,7 +94,7 @@ class TestFormatUtils:
         # Test custom format
         assert formatter.date(test_date, format="%b %d, %Y") == "Jan 15, 2023"
 
-    def test_datetime_formatting(self):
+    def test_datetime_formatting(self) -> None:
         """Test datetime formatting."""
         formatter = FormatUtils()
 
@@ -106,7 +106,7 @@ class TestFormatUtils:
         # Test with None
         assert formatter.format_datetime(None) == ""
 
-    def test_time_formatting(self):
+    def test_time_formatting(self) -> None:
         """Test time formatting."""
         formatter = FormatUtils()
 
@@ -118,7 +118,7 @@ class TestFormatUtils:
         # Test with None
         assert formatter.time_format(None) == ""
 
-    def test_return_percentage_formatting(self):
+    def test_return_percentage_formatting(self) -> None:
         """Test return percentage formatting with sign."""
         formatter = FormatUtils()
 
@@ -132,7 +132,7 @@ class TestFormatUtils:
         # Test zero
         assert formatter.return_pct(0) == "+0.00%"
 
-    def test_ratio_formatting(self):
+    def test_ratio_formatting(self) -> None:
         """Test ratio formatting."""
         formatter = FormatUtils()
 
@@ -143,7 +143,7 @@ class TestFormatUtils:
         # Test custom decimals
         assert formatter.ratio(1.234, decimals=4) == "1.2340"
 
-    def test_leverage_ratio_formatting(self):
+    def test_leverage_ratio_formatting(self) -> None:
         """Test leverage ratio formatting."""
         formatter = FormatUtils()
 
@@ -154,7 +154,7 @@ class TestFormatUtils:
         # Test custom decimals
         assert formatter.leverage_ratio(2.0, decimals=3) == "2.000x"
 
-    def test_drawdown_formatting(self):
+    def test_drawdown_formatting(self) -> None:
         """Test drawdown formatting (always negative)."""
         formatter = FormatUtils()
 
@@ -165,15 +165,12 @@ class TestFormatUtils:
         # Test with positive input (should format as is)
         assert formatter.drawdown(0.1567) == "15.67%"
 
-    def test_none_values(self):
+    def test_none_values(self) -> None:
         """Test handling of None values."""
         formatter = FormatUtils()
 
         # Test None in currency (should handle gracefully)
         assert formatter.currency(None) == "$0.00"
-
-        # Test None in percentage (skip this test as it requires changes to the utility)
-        # assert "0.00%" == formatter.percentage(None)
 
         # Test None in number
         assert formatter.number(None) == "0"

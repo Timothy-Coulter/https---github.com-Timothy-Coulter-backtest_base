@@ -6,6 +6,7 @@ the entire optimization process using Optuna.
 
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -154,7 +155,7 @@ class OptimizationRunner(BaseOptimization):
         finally:
             self.end_time = time.time()
 
-    def _create_optuna_objective(self):
+    def _create_optuna_objective(self) -> Callable[[optuna.Trial], float]:
         """Create objective function for Optuna.
 
         Returns:
@@ -190,7 +191,7 @@ class OptimizationRunner(BaseOptimization):
 
                 # For single objective, return the first function result
                 if len(objective_functions) == 1:
-                    value = objective_functions[0](suggested_params)
+                    value: float = objective_functions[0](suggested_params)
                 else:
                     # For multiple objectives, combine them
                     value = sum(func(suggested_params) for func in objective_functions)
@@ -343,17 +344,17 @@ class OptimizationRunner(BaseOptimization):
         study = self.study_manager.get_study()
         return study.best_params if study.best_params else {}
 
-    def get_best_value(self) -> float | None:
+    def get_best_value(self) -> float:
         """Get the best objective value found.
 
         Returns:
             Best objective value
         """
         if self.optimization_result is not None:
-            return self.optimization_result.best_value
+            return self.optimization_result.best_value or 0.0
 
         study = self.study_manager.get_study()
-        return study.best_value
+        return study.best_value or 0.0
 
     def get_study_name(self) -> str:
         """Get the name of the optimization study.
@@ -385,7 +386,7 @@ class OptimizationRunner(BaseOptimization):
             raise ValueError("No best parameters available for validation")
 
         self.logger.info("Running final validation")
-        validation_results = []
+        validation_results: list[dict[str, Any]] = []
 
         for i in range(n_validation_trials):
             try:
@@ -402,7 +403,7 @@ class OptimizationRunner(BaseOptimization):
 
         # Calculate statistics
         if validation_results:
-            metrics_values = {}
+            metrics_values: dict[str, Any] = {}
             for metric in validation_results[0]['metrics']:
                 values = [
                     r['metrics'][metric] for r in validation_results if metric in r['metrics']

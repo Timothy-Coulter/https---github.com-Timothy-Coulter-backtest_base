@@ -137,16 +137,16 @@ class OptimizationObjective:
 
         def single_objective(params: dict[str, Any]) -> float:
             result = self._run_backtest(params)
-            primary_value = result.metrics.get(metric, 0.0)
+            primary_value: float = result.metrics.get(metric, 0.0)
 
             # Apply penalty constraints if specified
             if constraint_metric and constraint_metric in result.metrics:
                 constraint_value = result.metrics[constraint_metric]
                 if constraint_value < constraint_limit:
                     penalty = abs(constraint_value - constraint_limit) * penalty_factor
-                    return primary_value - penalty
+                    return float(primary_value - penalty)
 
-            return primary_value
+            return float(primary_value)
 
         self.objective_functions = [single_objective]
         self.objective_type = "single"
@@ -199,7 +199,7 @@ class OptimizationObjective:
 
         def constrained_objective(params: dict[str, Any]) -> float:
             result = self._run_backtest(params)
-            return result.metrics.get(objective_metric, 0.0)
+            return float(result.metrics.get(objective_metric, 0.0))
 
         self.objective_functions = [constrained_objective]
         if constraint_functions:

@@ -25,21 +25,21 @@ except ImportError as e:
 class TestPerformanceCalculator:
     """Test suite for the PerformanceCalculator class."""
 
-    def test_initialization(self):
+    def test_initialization(self) -> None:
         """Test PerformanceCalculator initialization."""
         calculator = PerformanceCalculator()
 
         assert calculator.risk_free_rate == 0.02  # Default 2%
         assert calculator.benchmark_return == 0.0  # Default 0%
 
-    def test_initialization_custom_params(self):
+    def test_initialization_custom_params(self) -> None:
         """Test PerformanceCalculator with custom parameters."""
         calculator = PerformanceCalculator(risk_free_rate=0.015, benchmark_return=0.08)
 
         assert calculator.risk_free_rate == 0.015
         assert calculator.benchmark_return == 0.08
 
-    def test_calculate_total_return(self):
+    def test_calculate_total_return(self) -> None:
         """Test total return calculation."""
         calculator = PerformanceCalculator()
 
@@ -50,7 +50,7 @@ class TestPerformanceCalculator:
         expected_return = (115 - 100) / 100  # 15%
         assert abs(result - expected_return) < 0.001
 
-    def test_calculate_annualized_return(self):
+    def test_calculate_annualized_return(self) -> None:
         """Test annualized return calculation."""
         calculator = PerformanceCalculator()
 
@@ -64,7 +64,7 @@ class TestPerformanceCalculator:
 
         assert abs(result - expected) < 0.001
 
-    def test_calculate_sharpe_ratio_basic(self):
+    def test_calculate_sharpe_ratio_basic(self) -> None:
         """Test basic Sharpe ratio calculation."""
         calculator = PerformanceCalculator()
 
@@ -77,7 +77,7 @@ class TestPerformanceCalculator:
         assert isinstance(result, (int, float))
         assert not np.isnan(result)
 
-    def test_calculate_sharpe_ratio_with_risk_free_rate(self):
+    def test_calculate_sharpe_ratio_with_risk_free_rate(self) -> None:
         """Test Sharpe ratio with custom risk-free rate."""
         calculator = PerformanceCalculator(risk_free_rate=0.02)
 
@@ -88,7 +88,7 @@ class TestPerformanceCalculator:
         assert isinstance(result, (int, float))
         assert not np.isnan(result)
 
-    def test_calculate_sortino_ratio(self):
+    def test_calculate_sortino_ratio(self) -> None:
         """Test Sortino ratio calculation."""
         calculator = PerformanceCalculator()
 
@@ -99,7 +99,7 @@ class TestPerformanceCalculator:
         assert isinstance(result, (int, float))
         assert not np.isnan(result)
 
-    def test_calculate_max_drawdown(self):
+    def test_calculate_max_drawdown(self) -> None:
         """Test maximum drawdown calculation."""
         calculator = PerformanceCalculator()
 
@@ -114,7 +114,7 @@ class TestPerformanceCalculator:
         assert 'drawdown_series' in result
         assert isinstance(result['drawdown_series'], pd.Series)
 
-    def test_calculate_volatility(self):
+    def test_calculate_volatility(self) -> None:
         """Test volatility calculation."""
         calculator = PerformanceCalculator()
 
@@ -125,7 +125,7 @@ class TestPerformanceCalculator:
         assert result >= 0  # Volatility should be non-negative
         assert not np.isnan(result)
 
-    def test_calculate_win_rate(self):
+    def test_calculate_win_rate(self) -> None:
         """Test win rate calculation."""
         calculator = PerformanceCalculator()
 
@@ -138,7 +138,7 @@ class TestPerformanceCalculator:
 
         assert result == expected_rate
 
-    def test_calculate_profit_factor(self):
+    def test_calculate_profit_factor(self) -> None:
         """Test profit factor calculation."""
         calculator = PerformanceCalculator()
 
@@ -152,7 +152,7 @@ class TestPerformanceCalculator:
 
         assert result == expected
 
-    def test_calculate_calmar_ratio(self):
+    def test_calculate_calmar_ratio(self) -> None:
         """Test Calmar ratio calculation."""
         calculator = PerformanceCalculator()
 
@@ -166,7 +166,7 @@ class TestPerformanceCalculator:
         assert isinstance(result, (int, float))
         assert not np.isnan(result)
 
-    def test_calculate_beta(self):
+    def test_calculate_beta(self) -> None:
         """Test beta calculation against benchmark."""
         calculator = PerformanceCalculator()
 
@@ -178,7 +178,7 @@ class TestPerformanceCalculator:
         assert isinstance(result, (int, float))
         assert not np.isnan(result)
 
-    def test_calculate_alpha(self):
+    def test_calculate_alpha(self) -> None:
         """Test alpha calculation."""
         calculator = PerformanceCalculator()
 
@@ -190,7 +190,7 @@ class TestPerformanceCalculator:
 
         assert isinstance(result, (int, float))
 
-    def test_calculate_information_ratio(self):
+    def test_calculate_information_ratio(self) -> None:
         """Test information ratio calculation."""
         calculator = PerformanceCalculator()
 
@@ -202,7 +202,7 @@ class TestPerformanceCalculator:
         assert isinstance(result, (int, float))
         assert not np.isnan(result)
 
-    def test_calculate_var(self):
+    def test_calculate_var(self) -> None:
         """Test Value at Risk (VaR) calculation."""
         calculator = PerformanceCalculator()
 
@@ -213,7 +213,7 @@ class TestPerformanceCalculator:
         assert isinstance(result, (int, float))
         assert result < 0  # VaR should be negative (loss)
 
-    def test_calculate_cvar(self):
+    def test_calculate_cvar(self) -> None:
         """Test Conditional Value at Risk (CVaR) calculation."""
         calculator = PerformanceCalculator()
 
@@ -228,7 +228,7 @@ class TestPerformanceCalculator:
 class TestPerformanceMetrics:
     """Test suite for PerformanceMetrics dataclass."""
 
-    def test_metrics_creation(self):
+    def test_metrics_creation(self) -> None:
         """Test creation of PerformanceMetrics object."""
         metrics = PerformanceMetrics(
             total_return=0.15, annualized_return=0.12, sharpe_ratio=1.25, max_drawdown=-0.08
@@ -239,7 +239,7 @@ class TestPerformanceMetrics:
         assert metrics.sharpe_ratio == 1.25
         assert metrics.max_drawdown == -0.08
 
-    def test_metrics_to_dict(self):
+    def test_metrics_to_dict(self) -> None:
         """Test conversion of metrics to dictionary."""
         metrics = PerformanceMetrics(
             total_return=0.15,
@@ -255,7 +255,7 @@ class TestPerformanceMetrics:
         assert result['total_return'] == 0.15
         assert result['sharpe_ratio'] == 1.25
 
-    def test_metrics_from_dict(self):
+    def test_metrics_from_dict(self) -> None:
         """Test creation of metrics from dictionary."""
         data = {
             'total_return': 0.15,
@@ -273,7 +273,7 @@ class TestPerformanceMetrics:
 class TestRiskMetrics:
     """Test suite for RiskMetrics dataclass."""
 
-    def test_risk_metrics_creation(self):
+    def test_risk_metrics_creation(self) -> None:
         """Test creation of RiskMetrics object."""
         risk_metrics = RiskMetrics(
             volatility=0.18, var_95=-0.05, cvar_95=-0.07, beta=1.1, correlation=0.85
@@ -284,10 +284,10 @@ class TestRiskMetrics:
         assert risk_metrics.cvar_95 == -0.07
         assert risk_metrics.beta == 1.1
 
-    def test_risk_metrics_comparison(self):
+    def test_risk_metrics_comparison(self) -> None:
         """Test comparison of risk metrics."""
-        risk1 = RiskMetrics(volatility=0.15, var_95=-0.04)
-        risk2 = RiskMetrics(volatility=0.20, var_95=-0.06)
+        risk1 = RiskMetrics(volatility=0.15, var_95=-0.04, cvar_95=-0.06, beta=1.0, correlation=0.8)
+        risk2 = RiskMetrics(volatility=0.20, var_95=-0.06, cvar_95=-0.08, beta=1.2, correlation=0.9)
 
         assert risk1.volatility < risk2.volatility
         assert risk1.var_95 > risk2.var_95  # Less negative is better
@@ -296,13 +296,13 @@ class TestRiskMetrics:
 class TestDrawdownAnalyzer:
     """Test suite for DrawdownAnalyzer class."""
 
-    def test_initialization(self):
+    def test_initialization(self) -> None:
         """Test DrawdownAnalyzer initialization."""
         analyzer = DrawdownAnalyzer()
 
         assert analyzer.min_drawdown_threshold == -0.20  # Default 20%
 
-    def test_find_drawdown_periods(self):
+    def test_find_drawdown_periods(self) -> None:
         """Test identification of drawdown periods."""
         analyzer = DrawdownAnalyzer()
 
@@ -314,7 +314,7 @@ class TestDrawdownAnalyzer:
         assert isinstance(periods, list)
         assert len(periods) > 0  # Should identify at least one drawdown
 
-    def test_calculate_drawdown_duration(self):
+    def test_calculate_drawdown_duration(self) -> None:
         """Test calculation of drawdown duration."""
         analyzer = DrawdownAnalyzer()
 
@@ -327,7 +327,7 @@ class TestDrawdownAnalyzer:
         assert 'avg_duration' in duration
         assert 'max_duration' in duration
 
-    def test_calculate_recovery_factor(self):
+    def test_calculate_recovery_factor(self) -> None:
         """Test recovery factor calculation."""
         analyzer = DrawdownAnalyzer()
 
@@ -343,13 +343,13 @@ class TestDrawdownAnalyzer:
 class TestReturnAnalyzer:
     """Test suite for ReturnAnalyzer class."""
 
-    def test_initialization(self):
+    def test_initialization(self) -> None:
         """Test ReturnAnalyzer initialization."""
         analyzer = ReturnAnalyzer()
 
         assert analyzer.compound_returns is True
 
-    def test_calculate_cumulative_returns(self):
+    def test_calculate_cumulative_returns(self) -> None:
         """Test cumulative returns calculation."""
         analyzer = ReturnAnalyzer()
 
@@ -361,7 +361,7 @@ class TestReturnAnalyzer:
         assert len(result) == len(returns) + 1  # Includes starting value
         assert result.iloc[0] == 1.0  # Starting value should be 1.0
 
-    def test_calculate_rolling_returns(self):
+    def test_calculate_rolling_returns(self) -> None:
         """Test rolling returns calculation."""
         analyzer = ReturnAnalyzer()
 
@@ -377,7 +377,7 @@ class TestReturnAnalyzer:
             result.iloc[window - 1 :].notna().all()
         )  # Values from window onwards should be calculated
 
-    def test_decompose_returns(self):
+    def test_decompose_returns(self) -> None:
         """Test return decomposition."""
         analyzer = ReturnAnalyzer()
 
@@ -395,13 +395,13 @@ class TestReturnAnalyzer:
 class TestSharpeCalculator:
     """Test suite for SharpeCalculator class."""
 
-    def test_initialization(self):
+    def test_initialization(self) -> None:
         """Test SharpeCalculator initialization."""
         calculator = SharpeCalculator(risk_free_rate=0.02)
 
         assert calculator.risk_free_rate == 0.02
 
-    def test_calculate_sharpe_ratio(self):
+    def test_calculate_sharpe_ratio(self) -> None:
         """Test Sharpe ratio calculation."""
         calculator = SharpeCalculator()
 
@@ -412,7 +412,7 @@ class TestSharpeCalculator:
         assert isinstance(result, (int, float))
         assert not np.isnan(result)
 
-    def test_calculate_information_ratio(self):
+    def test_calculate_information_ratio(self) -> None:
         """Test information ratio calculation."""
         calculator = SharpeCalculator()
 
@@ -423,7 +423,7 @@ class TestSharpeCalculator:
         assert isinstance(result, (int, float))
         assert not np.isnan(result)
 
-    def test_calculate_treynor_ratio(self):
+    def test_calculate_treynor_ratio(self) -> None:
         """Test Treynor ratio calculation."""
         calculator = SharpeCalculator()
 
@@ -440,11 +440,11 @@ class TestSharpeCalculator:
     "returns,expected_sharpe",
     [
         ([0.02, -0.01, 0.03, -0.02, 0.01], "calculable"),
-        ([0.01] * 10, float('inf')),  # Constant returns should give inf Sharpe due to zero std
+        ([0.01] * 10, "infinite"),  # Constant returns should give inf Sharpe due to zero std
         ([-0.05] * 5 + [0.05] * 5, "calculable"),
     ],
 )
-def test_sharpe_ratio_parametrized(returns, expected_sharpe):
+def test_sharpe_ratio_parametrized(returns: list[float], expected_sharpe: str) -> None:
     """Parametrized test for Sharpe ratio calculations."""
     calculator = SharpeCalculator()
     returns_series = pd.Series(returns)
@@ -454,13 +454,12 @@ def test_sharpe_ratio_parametrized(returns, expected_sharpe):
     if expected_sharpe == "calculable":
         assert not np.isnan(result)
         assert np.isfinite(result)
+    elif expected_sharpe == "infinite":
+        # When std is zero, Sharpe ratio becomes inf, which is expected behavior
+        assert np.isinf(result)
     else:
-        # Handle the case where constant returns result in zero std (division by zero)
-        if expected_sharpe == float('inf'):
-            # When std is zero, Sharpe ratio becomes inf, which is expected behavior
-            assert np.isinf(result)
-        else:
-            assert abs(result - expected_sharpe) < 1e-10
+        # This case should not occur with current test data
+        raise AssertionError(f"Unexpected expected_sharpe value: {expected_sharpe}")
 
 
 if __name__ == "__main__":

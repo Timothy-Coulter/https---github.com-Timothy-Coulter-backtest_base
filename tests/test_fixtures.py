@@ -6,6 +6,8 @@ that are used across multiple test modules.
 
 import json
 import tempfile
+from collections.abc import Generator
+from typing import Any
 from unittest.mock import Mock
 
 import numpy as np
@@ -15,7 +17,7 @@ import pytest
 
 # Sample market data for testing
 @pytest.fixture(scope="session")
-def sample_ohlcv_data():
+def sample_ohlcv_data() -> pd.DataFrame:
     """Generate sample OHLCV data for testing."""
     dates = pd.date_range(start="2020-01-01", end="2024-01-01", freq="D")
     np.random.seed(42)  # For reproducible tests
@@ -45,10 +47,10 @@ def sample_ohlcv_data():
 
 
 @pytest.fixture(scope="session")
-def multiple_symbol_data():
+def multiple_symbol_data() -> dict[str, pd.DataFrame]:
     """Generate sample data for multiple symbols."""
     symbols = ['SPY', 'AAPL', 'GOOGL', 'MSFT', 'TSLA']
-    symbol_data = {}
+    symbol_data: dict[str, pd.DataFrame] = {}
 
     for symbol in symbols:
         dates = pd.date_range(start="2020-01-01", end="2024-01-01", freq="D")
@@ -81,7 +83,7 @@ def multiple_symbol_data():
 
 
 @pytest.fixture
-def portfolio_test_data():
+def portfolio_test_data() -> dict[str, Any]:
     """Generate test data for portfolio testing."""
     return {
         'initial_capital': 10000.0,
@@ -96,7 +98,7 @@ def portfolio_test_data():
 
 
 @pytest.fixture
-def strategy_test_config():
+def strategy_test_config() -> dict[str, Any]:
     """Generate test configuration for strategies."""
     return {
         'moving_average': {
@@ -111,7 +113,7 @@ def strategy_test_config():
 
 
 @pytest.fixture
-def risk_control_test_config():
+def risk_control_test_config() -> dict[str, Any]:
     """Generate test configuration for risk controls."""
     return {
         'stop_loss': {
@@ -130,7 +132,7 @@ def risk_control_test_config():
 
 
 @pytest.fixture
-def performance_test_metrics():
+def performance_test_metrics() -> dict[str, Any]:
     """Generate sample performance metrics for testing."""
     dates = pd.date_range(start="2020-01-01", end="2024-01-01", freq="D")
 
@@ -153,7 +155,7 @@ def performance_test_metrics():
     }
 
 
-def generate_test_trades_data():
+def generate_test_trades_data() -> pd.DataFrame:
     """Generate test trades data."""
     return pd.DataFrame(
         {
@@ -168,7 +170,7 @@ def generate_test_trades_data():
     )
 
 
-def generate_test_positions_data():
+def generate_test_positions_data() -> pd.DataFrame:
     """Generate test positions data."""
     symbols = ['SPY', 'AAPL', 'GOOGL', 'MSFT', 'TSLA']
     return pd.DataFrame(
@@ -184,14 +186,14 @@ def generate_test_positions_data():
 
 
 @pytest.fixture
-def temp_directory():
+def temp_directory() -> Generator[str, None, None]:
     """Create a temporary directory for test files."""
     with tempfile.TemporaryDirectory() as tmp_dir:
         yield tmp_dir
 
 
 @pytest.fixture
-def mock_data_provider():
+def mock_data_provider() -> Mock:
     """Create a mock data provider."""
     provider = Mock()
     provider.get_data = Mock(
@@ -208,7 +210,7 @@ def mock_data_provider():
 
 
 @pytest.fixture
-def mock_broker():
+def mock_broker() -> Mock:
     """Create a mock broker."""
     broker = Mock()
     broker.submit_order = Mock(
@@ -229,7 +231,7 @@ def mock_broker():
 
 
 @pytest.fixture
-def mock_strategy():
+def mock_strategy() -> Mock:
     """Create a mock strategy."""
     strategy = Mock()
     strategy.generate_signals = Mock(
@@ -254,7 +256,7 @@ def mock_strategy():
 
 
 @pytest.fixture
-def mock_portfolio():
+def mock_portfolio() -> Mock:
     """Create a mock portfolio."""
     portfolio = Mock()
     portfolio.add_position = Mock(return_value=True)
@@ -267,7 +269,7 @@ def mock_portfolio():
 
 
 @pytest.fixture
-def sample_config_dict():
+def sample_config_dict() -> dict[str, Any]:
     """Sample configuration dictionary for testing."""
     return {
         'backtest': {
@@ -297,7 +299,7 @@ def sample_config_dict():
 
 
 @pytest.fixture
-def benchmark_data():
+def benchmark_data() -> pd.Series:
     """Generate benchmark data for comparison testing."""
     dates = pd.date_range(start="2020-01-01", end="2024-01-01", freq="D")
     np.random.seed(123)  # Different seed for benchmark
@@ -310,7 +312,7 @@ def benchmark_data():
 
 
 @pytest.fixture
-def economic_indicators():
+def economic_indicators() -> pd.DataFrame:
     """Generate sample economic indicators."""
     dates = pd.date_range(start="2020-01-01", end="2024-01-01", freq="M")
 
@@ -327,7 +329,7 @@ def economic_indicators():
 
 
 @pytest.fixture
-def sector_data():
+def sector_data() -> pd.DataFrame:
     """Generate sample sector performance data."""
     return pd.DataFrame(
         {
@@ -342,7 +344,7 @@ def sector_data():
 
 
 @pytest.fixture
-def news_sentiment_data():
+def news_sentiment_data() -> pd.DataFrame:
     """Generate sample news sentiment data."""
     dates = pd.date_range(start="2020-01-01", end="2024-01-01", freq="D")
 
@@ -360,7 +362,9 @@ class TestDataGenerator:
     """Helper class for generating test data."""
 
     @staticmethod
-    def create_trending_data(length=100, start_price=100, trend=0.001, volatility=0.02):
+    def create_trending_data(
+        length: int = 100, start_price: float = 100, trend: float = 0.001, volatility: float = 0.02
+    ) -> pd.Series:
         """Create trending price data."""
         np.random.seed(42)
         dates = pd.date_range(start="2020-01-01", periods=length, freq="D")
@@ -371,7 +375,9 @@ class TestDataGenerator:
         return pd.Series(prices, index=dates)
 
     @staticmethod
-    def create_volatile_data(length=100, start_price=100, volatility=0.05):
+    def create_volatile_data(
+        length: int = 100, start_price: float = 100, volatility: float = 0.05
+    ) -> pd.Series:
         """Create volatile price data."""
         np.random.seed(123)
         dates = pd.date_range(start="2020-01-01", periods=length, freq="D")
@@ -382,13 +388,15 @@ class TestDataGenerator:
         return pd.Series(prices, index=dates)
 
     @staticmethod
-    def create_sideways_data(length=100, price_range=(90, 110)):
+    def create_sideways_data(
+        length: int = 100, price_range: tuple[float, float] = (90, 110)
+    ) -> pd.Series:
         """Create sideways/consolidating price data."""
         np.random.seed(456)
         dates = pd.date_range(start="2020-01-01", periods=length, freq="D")
 
         min_price, max_price = price_range
-        prices = []
+        prices: list[float] = []
         current_price = (min_price + max_price) / 2
 
         for _ in range(length):
@@ -400,7 +408,7 @@ class TestDataGenerator:
         return pd.Series(prices, index=dates)
 
     @staticmethod
-    def create_synthetic_ohlcv(length=100, start_price=100):
+    def create_synthetic_ohlcv(length: int = 100, start_price: float = 100) -> pd.DataFrame:
         """Create synthetic OHLCV data."""
         np.random.seed(789)
         dates = pd.date_range(start="2020-01-01", periods=length, freq="D")
@@ -438,9 +446,9 @@ class ConfigFactory:
     """Factory for creating test configurations."""
 
     @staticmethod
-    def create_backtest_config(**overrides):
+    def create_backtest_config(**overrides: Any) -> dict[str, Any]:
         """Create a backtest configuration."""
-        config = {
+        config: dict[str, Any] = {
             'initial_capital': 10000.0,
             'commission_rate': 0.001,
             'slippage': 0.0005,
@@ -452,9 +460,11 @@ class ConfigFactory:
         return config
 
     @staticmethod
-    def create_strategy_config(strategy_name='moving_average', **overrides):
+    def create_strategy_config(
+        strategy_name: str = 'moving_average', **overrides: Any
+    ) -> dict[str, Any]:
         """Create a strategy configuration."""
-        base_configs = {
+        base_configs: dict[str, dict[str, Any]] = {
             'moving_average': {
                 'fast_period': 10,
                 'slow_period': 20,
@@ -465,12 +475,12 @@ class ConfigFactory:
             'bollinger_bands': {'period': 20, 'std_dev': 2.0},
         }
 
-        config = base_configs.get(strategy_name, {})
+        config: dict[str, Any] = base_configs.get(strategy_name, {})
         config.update(overrides)
         return config
 
     @staticmethod
-    def create_risk_config(**overrides):
+    def create_risk_config(**overrides: Any) -> dict[str, Any]:
         """Create a risk management configuration."""
         config = {
             'stop_loss': 0.025,
@@ -487,18 +497,18 @@ class MockMarketData:
     """Class for creating mock market data scenarios."""
 
     @staticmethod
-    def bull_market():
+    def bull_market() -> pd.Series:
         """Create bull market conditions."""
         dates = pd.date_range(start="2020-03-01", end="2021-12-31", freq="D")
         np.random.seed(42)
 
         returns = np.random.normal(0.0015, 0.015, len(dates))  # Positive bias
-        prices = 100 * np.cumprod(1 + returns)
+        prices = 100 * np.cumprod(1 + np.array(returns))
 
         return pd.Series(prices, index=dates)
 
     @staticmethod
-    def bear_market():
+    def bear_market() -> pd.Series:
         """Create bear market conditions."""
         dates = pd.date_range(start="2022-01-01", end="2022-12-31", freq="D")
         np.random.seed(123)
@@ -509,28 +519,30 @@ class MockMarketData:
         return pd.Series(prices, index=dates)
 
     @staticmethod
-    def crisis_data():
+    def crisis_data() -> pd.Series:
         """Create financial crisis-like data."""
         dates = pd.date_range(start="2008-09-01", end="2009-03-31", freq="D")
         np.random.seed(456)
 
         # Create a sharp drop followed by gradual recovery
-        returns = []
+        returns: list[float] = []
         for i in range(len(dates)):
             if i < len(dates) // 3:
                 # Crash phase
-                returns.append(np.random.normal(-0.03, 0.04))
+                returns.append(float(np.random.normal(-0.03, 0.04)))
             else:
                 # Recovery phase
-                returns.append(np.random.normal(0.01, 0.025))
+                returns.append(float(np.random.normal(0.01, 0.025)))
 
-        prices = 100 * np.cumprod(1 + returns)
+        prices = 100 * np.cumprod(1 + np.array(returns))
 
         return pd.Series(prices, index=dates)
 
 
 # Utility functions for test data comparison
-def assert_dataframe_equal(df1, df2, check_dtype=False, check_exact=True):
+def assert_dataframe_equal(
+    df1: pd.DataFrame, df2: pd.DataFrame, check_dtype: bool = False, check_exact: bool = True
+) -> None:
     """Assert that two DataFrames are equal."""
     assert isinstance(df1, pd.DataFrame), "First argument must be DataFrame"
     assert isinstance(df2, pd.DataFrame), "Second argument must be DataFrame"
@@ -548,7 +560,7 @@ def assert_dataframe_equal(df1, df2, check_dtype=False, check_exact=True):
         pd.testing.assert_frame_equal(df1, df2, rtol=1e-10, atol=1e-10)
 
 
-def assert_series_equal(s1, s2, check_dtype=False):
+def assert_series_equal(s1: pd.Series, s2: pd.Series, check_dtype: bool = False) -> None:
     """Assert that two Series are equal."""
     assert isinstance(s1, pd.Series), "First argument must be Series"
     assert isinstance(s2, pd.Series), "Second argument must be Series"
@@ -560,16 +572,18 @@ def assert_series_equal(s1, s2, check_dtype=False):
     pd.testing.assert_series_equal(s1, s2, rtol=1e-10, atol=1e-10)
 
 
-def create_test_config_file(config_dict, file_path):
+def create_test_config_file(config_dict: dict[str, Any], file_path: str) -> None:
     """Create a test configuration file."""
     with open(file_path, 'w') as f:
         json.dump(config_dict, f, indent=2, default=str)
 
 
-def load_test_config_file(file_path):
+def load_test_config_file(file_path: str) -> dict[str, Any]:
     """Load a test configuration file."""
     with open(file_path) as f:
-        return json.load(f)
+        result = json.load(f)
+        assert isinstance(result, dict)
+        return result
 
 
 # Pytest markers for test categorization

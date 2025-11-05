@@ -7,6 +7,7 @@ that are used across all test modules.
 import os
 import sys
 from datetime import datetime
+from typing import Any
 from unittest.mock import Mock
 
 import numpy as np
@@ -18,7 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 # Pytest configuration
-def pytest_configure(config):
+def pytest_configure(config: Any) -> None:
     """Configure pytest with custom markers and settings."""
     config.addinivalue_line(
         "markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')"
@@ -28,7 +29,7 @@ def pytest_configure(config):
 
 
 @pytest.fixture(scope="session")
-def test_data():
+def test_data() -> pd.DataFrame:
     """Generate sample test data for use in tests."""
     dates = pd.date_range(start="2020-01-01", end="2024-01-01", freq="D")
     np.random.seed(42)  # For reproducible tests
@@ -58,7 +59,7 @@ def test_data():
 
 
 @pytest.fixture
-def mock_config():
+def mock_config() -> Mock:
     """Mock configuration object for testing."""
     config = Mock()
 
@@ -121,7 +122,7 @@ def mock_config():
 
 
 @pytest.fixture
-def sample_portfolio_state():
+def sample_portfolio_state() -> Mock:
     """Sample portfolio state for testing."""
     state = Mock()
     state.total_value = 1100.0
@@ -135,7 +136,7 @@ def sample_portfolio_state():
 
 
 @pytest.fixture
-def mock_broker():
+def mock_broker() -> Mock:
     """Mock broker for testing order execution."""
     broker = Mock()
     broker.execute_order = Mock(
@@ -153,7 +154,7 @@ def mock_broker():
 
 
 @pytest.fixture
-def mock_logger():
+def mock_logger() -> Mock:
     """Mock logger for testing."""
     logger = Mock()
     logger.info = Mock()
@@ -164,7 +165,7 @@ def mock_logger():
 
 
 @pytest.fixture
-def performance_metrics():
+def performance_metrics() -> dict[str, Any]:
     """Sample performance metrics for testing."""
     return {
         'total_return': 0.15,
@@ -181,7 +182,7 @@ def performance_metrics():
 
 
 @pytest.fixture
-def strategy_signals():
+def strategy_signals() -> pd.DataFrame:
     """Sample strategy signals for testing."""
     return pd.DataFrame(
         {
@@ -194,7 +195,7 @@ def strategy_signals():
 
 
 # Utility functions for tests
-def assert_valid_dataframe(df, expected_columns=None):
+def assert_valid_dataframe(df: pd.DataFrame, expected_columns: list[str] | None = None) -> None:
     """Assert that a DataFrame is valid and optionally check columns."""
     assert isinstance(df, pd.DataFrame), "Expected DataFrame"
     assert not df.empty, "DataFrame should not be empty"
@@ -205,7 +206,9 @@ def assert_valid_dataframe(df, expected_columns=None):
     assert df.index.is_monotonic_increasing, "DataFrame index should be sorted"
 
 
-def create_test_order(ticker='TEST', side='buy', quantity=10, order_type='market'):
+def create_test_order(
+    ticker: str = 'TEST', side: str = 'buy', quantity: int = 10, order_type: str = 'market'
+) -> dict[str, Any]:
     """Create a test order for use in tests."""
     return {
         'ticker': ticker,

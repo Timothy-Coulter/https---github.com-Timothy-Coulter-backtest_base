@@ -118,16 +118,22 @@ class OptunaStudyManager:
             config.set_study_name(self.study_name)
 
         try:
-            self._study = optuna.load_study(
-                study_name=config.study_name,
-                storage=config.get_storage_url(),
-            )
+            storage_url = config.get_storage_url()
+            if storage_url:
+                self._study = optuna.load_study(
+                    study_name=config.study_name,
+                    storage=storage_url,
+                )
+            else:
+                self._study = optuna.load_study(
+                    study_name=config.study_name,
+                    storage=None,  # type: ignore[arg-type]
+                )
 
             self.logger.info(f"Loaded existing study: {self.study_name}")
             self.logger.info(f"Trials completed: {len(self._study.trials)}")
 
             return self._study
-
         except Exception as e:
             self.logger.error(f"Failed to load study: {e}")
             raise
@@ -158,13 +164,19 @@ class OptunaStudyManager:
             return
 
         try:
-            optuna.delete_study(
-                study_name=self.study_name,
-                storage=self.storage_url,
-            )
+            if self.storage_url:
+                optuna.delete_study(
+                    study_name=self.study_name,
+                    storage=self.storage_url,
+                )
+            else:
+                optuna.delete_study(
+                    study_name=self.study_name,
+                    storage=None,  # type: ignore[arg-type]
+                )
+
             self.logger.info(f"Deleted study: {self.study_name}")
             self._study = None
-
         except Exception as e:
             self.logger.error(f"Failed to delete study: {e}")
             raise
