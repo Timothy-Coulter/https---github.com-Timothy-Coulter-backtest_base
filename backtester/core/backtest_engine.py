@@ -19,7 +19,7 @@ from backtester.data.data_retrieval import DataRetrieval
 from backtester.execution.broker import SimulatedBroker
 from backtester.execution.order import OrderSide, OrderType
 from backtester.portfolio.portfolio import DualPoolPortfolio
-from backtester.portfolio.risk_manager import RiskManager
+from backtester.risk_management.risk_control_manager import RiskControlManager
 from backtester.strategy.base import BaseStrategy
 from backtester.strategy.moving_average import DualPoolMovingAverageStrategy
 
@@ -42,9 +42,8 @@ class BacktestEngine:
         self.logger: logging.Logger = logger or get_backtester_logger(__name__)
 
         # Initialize components immediately (for test compatibility)
-        self.data_handler = DataHandler(
-            self.config.__dict__ if hasattr(self.config, '__dict__') else None, self.logger
-        )
+        assert self.config.data is not None
+        self.data_handler = DataRetrieval(self.config.data)
         assert self.config.performance is not None
         self.performance_analyzer = PerformanceAnalyzer(
             self.config.performance.risk_free_rate, self.logger
@@ -61,7 +60,7 @@ class BacktestEngine:
         self.current_strategy: BaseStrategy | None = None
         self.current_portfolio: DualPoolPortfolio | None = None
         self.current_broker: SimulatedBroker | None = None
-        self.current_risk_manager: RiskManager | None = None
+        self.current_risk_manager: RiskControlManager | None = None
 
         # Results storage
         self.backtest_results: dict[str, Any] = {}
@@ -219,13 +218,13 @@ class BacktestEngine:
         self.logger.info("Created simulated broker")
         return self.current_broker
 
-    def create_risk_manager(self) -> RiskManager:
+    def create_risk_manager(self) -> RiskControlManager:
         """Create risk manager instance.
 
         Returns:
             Risk manager instance
         """
-        self.current_risk_manager = RiskManager(
+        self.current_risk_manager = RiskControlManager(
             max_portfolio_var=self.config.risk.max_portfolio_risk if self.config.risk else 0.02,
             max_single_position=self.config.risk.max_position_size if self.config.risk else 0.10,
             max_leverage=self.config.risk.max_leverage if self.config.risk else 5.0,

@@ -9,9 +9,9 @@ import argparse
 import os
 
 import optuna
-import psycopg2
+import psycopg2  # type: ignore[import-untyped]
 from dotenv import load_dotenv
-from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
+from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT  # type: ignore[import-untyped]
 
 # Load environment variables
 load_dotenv()

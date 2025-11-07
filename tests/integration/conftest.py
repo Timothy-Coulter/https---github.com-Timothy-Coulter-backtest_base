@@ -17,7 +17,7 @@ import pytest
 # Import backtester modules
 from backtester.core.backtest_engine import BacktestEngine
 from backtester.core.performance import PerformanceAnalyzer
-from backtester.data.data_handler import DataHandler
+from backtester.data.data_retrieval import DataRetrieval, DataRetrievalConfig
 from backtester.execution.broker import SimulatedBroker
 from backtester.portfolio.portfolio import DualPoolPortfolio
 from backtester.portfolio.risk_manager import RiskManager
@@ -400,13 +400,14 @@ def backtester_components(integration_test_config: Mock) -> dict[str, Any]:
             risk_free_rate=integration_test_config.performance.risk_free_rate, logger=logger
         )
 
-        components['data_handler'] = DataHandler(
-            config=(
-                integration_test_config.__dict__
-                if hasattr(integration_test_config, '__dict__')
-                else None
-            ),
-            logger=logger,
+        components['data_handler'] = DataRetrieval(
+            config=DataRetrievalConfig(
+                data_source="yahoo",
+                tickers=["SPY"],
+                fields=["open", "close", "high", "low", "volume"],
+                start_date="2020-01-01",
+                finish_date="2024-01-01",
+            )
         )
 
     except Exception as e:

@@ -10,6 +10,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from backtester.core.config import SimulatedBrokerConfig
+
 from .order import Order, OrderManager, OrderType
 
 
@@ -18,34 +20,46 @@ class SimulatedBroker:
 
     def __init__(
         self,
-        commission_rate: float = 0.001,
-        min_commission: float = 1.0,
-        spread: float = 0.0001,
-        slippage_model: str = "normal",
-        slippage_std: float = 0.0005,
-        latency_ms: float = 0.0,
+        config: SimulatedBrokerConfig | None = None,
+        commission_rate: float | None = None,
+        min_commission: float | None = None,
+        spread: float | None = None,
+        slippage_model: str | None = None,
+        slippage_std: float | None = None,
+        latency_ms: float | None = None,
         logger: logging.Logger | None = None,
     ) -> None:
         """Initialize the simulated broker.
 
         Args:
-            commission_rate: Commission rate for trades (as decimal)
-            min_commission: Minimum commission per trade
-            spread: Bid-ask spread (as decimal)
-            slippage_model: Type of slippage model ('normal', 'fixed', 'none')
-            slippage_std: Standard deviation for slippage simulation
-            latency_ms: Simulated latency in milliseconds
+            config: SimulatedBrokerConfig instance. If provided, other parameters are ignored.
+            commission_rate: Commission rate for trades (as decimal) - deprecated, use config
+            min_commission: Minimum commission per trade - deprecated, use config
+            spread: Bid-ask spread (as decimal) - deprecated, use config
+            slippage_model: Type of slippage model - deprecated, use config
+            slippage_std: Standard deviation for slippage simulation - deprecated, use config
+            latency_ms: Simulated latency in milliseconds - deprecated, use config
             logger: Optional logger instance
         """
         self.logger: logging.Logger = logger or logging.getLogger(__name__)
 
-        # Broker parameters
-        self.commission_rate: float = commission_rate
-        self.min_commission: float = min_commission
-        self.spread: float = spread
-        self.slippage_model: str = slippage_model
-        self.slippage_std: float = slippage_std
-        self.latency_ms: float = latency_ms
+        # Use config if provided, otherwise use individual parameters
+        if config is not None:
+            # Use config values - define attributes once
+            self.commission_rate = config.commission_rate
+            self.min_commission = config.min_commission
+            self.spread = config.spread
+            self.slippage_model = config.slippage_model
+            self.slippage_std = config.slippage_std
+            self.latency_ms = config.latency_ms
+        else:
+            # Backward compatibility - use individual parameters with defaults
+            self.commission_rate = commission_rate or 0.001
+            self.min_commission = min_commission or 1.0
+            self.spread = spread or 0.0001
+            self.slippage_model = slippage_model or "normal"
+            self.slippage_std = slippage_std or 0.0005
+            self.latency_ms = latency_ms or 0.0
 
         # State
         self.order_manager = OrderManager(logger)

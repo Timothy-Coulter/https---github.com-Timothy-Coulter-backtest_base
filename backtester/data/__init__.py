@@ -2,4 +2,4 @@
 
 from .data_retrieval import DataRetrieval
 
-__all__ = ['DataHandler']
+__all__ = ['DataRetrieval']

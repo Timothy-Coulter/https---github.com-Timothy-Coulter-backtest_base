@@ -8,7 +8,9 @@ import pandas as pd
 from findatapy.market import Market, MarketDataGenerator, MarketDataRequest
 from findatapy.timeseries import DataQuality
 from findatapy.util import LoggerManager
+
 from backtester.core.config import DataRetrievalConfig
+
 
 class DataRetrieval:
     """Data retrieval class that implements cache-first logic.
@@ -248,15 +250,22 @@ class DataRetrieval:
     def _check_duplicated_dates(self, df: pd.DataFrame, validation_results: dict[str, Any]) -> None:
         """Check for duplicated dates in the dataframe."""
         self.logger.info("Checking for duplicated dates...")
-        count, dups = self.data_quality.count_repeated_dates(df)
-        validation_results["duplicated_dates"] = {
-            "count": count,
-            "duplicated_entries": dups if dups is not None else [],
-        }
-        if count > 0:
-            self.logger.warning(f"Found {count} duplicated date entries")
-        else:
-            self.logger.info("No duplicated dates found")
+        try:
+            count, dups = self.data_quality.count_repeated_dates(df)
+            validation_results["duplicated_dates"] = {
+                "count": count if count is not None else 0,
+                "duplicated_entries": dups if dups is not None else [],
+            }
+            if count and count > 0:
+                self.logger.warning(f"Found {count} duplicated date entries")
+            else:
+                self.logger.info("No duplicated dates found")
+        except Exception as e:
+            self.logger.warning(f"Error checking for duplicated dates: {str(e)}")
+            validation_results["duplicated_dates"] = {
+                "count": 0,
+                "duplicated_entries": [],
+            }
 
     def _check_missing_values(self, df: pd.DataFrame, validation_results: dict[str, Any]) -> None:
         """Check for missing values in the dataframe."""

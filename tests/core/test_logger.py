@@ -64,12 +64,6 @@ class TestBacktesterLogger:
         logger.set_level(LogLevel.ERROR)
         assert logger.level == LogLevel.ERROR
 
-    def test_set_level_invalid(self) -> None:
-        """Test that setting invalid log levels raises exception."""
-        # This test should be skipped as the validation doesn't currently check string vs enum
-        # The current implementation accepts string values through getattr()
-        pytest.skip("String validation not implemented in current version")
-
     def test_set_format_simple(self) -> None:
         """Test setting SIMPLE log format."""
         logger = BacktesterLogger()

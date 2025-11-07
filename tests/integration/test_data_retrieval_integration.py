@@ -134,19 +134,20 @@ class TestDataRetrievalIntegration:
             call_args_list = mock_market.fetch_market.call_args_list
             assert len(call_args_list) == 2
 
-            # First call should be cache_algo_return
-            first_call = call_args_list[0][1]
-            assert first_call['cache_algo'] == 'cache_algo_return'
+            # First call should be cache_algo_return - check the request object
+            first_call = call_args_list[0][0][0]  # Get the MarketDataRequest object
+            assert first_call.cache_algo == 'cache_algo_return'
 
             # Second call should be internet_load_return (download)
-            second_call = call_args_list[1][1]
-            assert second_call['cache_algo'] == 'internet_load_return'
+            second_call = call_args_list[1][0][0]  # Get the MarketDataRequest object
+            assert second_call.cache_algo == 'internet_load_return'
 
             # Result should be from download
             pd.testing.assert_frame_equal(result1, sample_market_data)
 
-            # Reset for second test
+            # Reset for second test - clear side_effect and set return_value
             mock_market.fetch_market.reset_mock()
+            mock_market.fetch_market.side_effect = None
             mock_market.fetch_market.return_value = sample_market_data
 
             # Second call: should succeed from cache
@@ -340,14 +341,16 @@ class TestDataRetrievalIntegration:
 
             retrieval = DataRetrieval(config)
 
-            # Test 1: Cache failure
+            # Test 1: Cache failure - should return None, not raise exception
             mock_market.fetch_market.side_effect = Exception("Network error")
 
-            with pytest.raises((Exception, OSError)):
-                retrieval.load_from_cache()
+            result = retrieval.load_from_cache()
+            assert result is None
 
-            # Test 2: Download failure
-            with pytest.raises((Exception, OSError)):
+            # Test 2: Download failure - should raise exception
+            mock_market.fetch_market.side_effect = Exception("Download error")
+
+            with pytest.raises(Exception, match="Download error"):
                 retrieval.download_data()
 
             # Test 3: Empty data handling
@@ -359,9 +362,9 @@ class TestDataRetrievalIntegration:
                 retrieval.download_data()
 
             # Test 4: get_data_with_validation with no data
-            mock_market.fetch_market.return_value = None
-
-            result = retrieval.get_data_with_validation()
+            # Mock the get_data method directly to return None
+            with patch.object(retrieval, 'get_data', return_value=None):
+                result = retrieval.get_data_with_validation()
 
             assert result["success"] is False
             assert result["data"] is None

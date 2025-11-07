@@ -2,14 +2,12 @@
 
 from .backtest_engine import BacktestEngine
 from .config import (
-    BacktestConfig,
     BacktesterConfig,
-    ConfigValidator,
     DataRetrievalConfig,
     ExecutionConfig,
     PerformanceConfig,
     PortfolioConfig,
-    RiskConfig,
+    ComprehensiveRiskConfig,
     StrategyConfig,
     get_config,
     reset_config,
@@ -21,7 +19,7 @@ from .performance import PerformanceAnalyzer
 __all__ = [
     'BacktestEngine',
     'BacktesterConfig',
-    'DataConfig',
+    'DataRetrievalConfig',
     'StrategyConfig',
     'PortfolioConfig',
     'ExecutionConfig',
