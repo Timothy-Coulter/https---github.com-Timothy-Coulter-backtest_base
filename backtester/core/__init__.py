@@ -3,11 +3,11 @@
 from .backtest_engine import BacktestEngine
 from .config import (
     BacktesterConfig,
+    ComprehensiveRiskConfig,
     DataRetrievalConfig,
     ExecutionConfig,
     PerformanceConfig,
     PortfolioConfig,
-    ComprehensiveRiskConfig,
     StrategyConfig,
     get_config,
     reset_config,

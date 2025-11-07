@@ -9,6 +9,7 @@ from typing import Any
 
 from .component_configs.risk_limit_config import RiskLimitConfig, RiskProfile
 
+
 class RiskLimits:
     """Risk limits management class."""
 

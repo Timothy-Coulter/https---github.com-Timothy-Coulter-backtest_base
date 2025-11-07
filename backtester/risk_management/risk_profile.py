@@ -38,7 +38,9 @@ class RiskProfile(BaseModel):
     # Core risk limits
     max_volatility: float = Field(ge=0.01, le=1.0, description="Maximum portfolio volatility")
     max_drawdown: float = Field(ge=0.01, le=1.0, description="Maximum portfolio drawdown")
-    target_sharpe_ratio: float = Field(ge=0.0, le=5.0, description="Target Sharpe ratio")
+    target_sharpe_ratio: float = Field(
+        default=0.8, ge=0.0, le=5.0, description="Target Sharpe ratio"
+    )
 
     # Position limits
     max_position_size: float = Field(ge=0.01, le=1.0, description="Maximum single position size")
@@ -68,9 +70,17 @@ class RiskProfile(BaseModel):
         if name.lower() in ['conservative', 'moderate', 'aggressive'] and len(data) == 0:
             data = self._get_predefined_profile(name.lower())
             data['name'] = name
-            data['profile_type'] = name.lower()
-
-        super().__init__(name=name, **data)
+            # Set the correct enum value instead of string
+            profile_type_map = {
+                'conservative': RiskProfileType.CONSERVATIVE,
+                'moderate': RiskProfileType.MODERATE,
+                'aggressive': RiskProfileType.AGGRESSIVE,
+            }
+            data['profile_type'] = profile_type_map[name.lower()]
+            # Don't pass name as both argument and in data
+            super().__init__(**data)
+        else:
+            super().__init__(name=name, **data)
 
     @classmethod
     def conservative(cls) -> 'RiskProfile':
@@ -316,9 +326,14 @@ class RiskProfile(BaseModel):
         Returns:
             Dictionary with profile summary
         """
+        # Handle both enum and string profile types
+        profile_type_value = (
+            self.profile_type.value if hasattr(self.profile_type, 'value') else self.profile_type
+        )
+
         return {
             'name': self.name,
-            'type': self.profile_type.value,
+            'type': profile_type_value,
             'description': self.description,
             'risk_limits': self.get_risk_limits(),
             'preferences': {

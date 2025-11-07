@@ -8,7 +8,9 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from backtester.risk_management.component_configs.comprehensive_risk_config import ComprehensiveRiskConfig
+from backtester.risk_management.component_configs.comprehensive_risk_config import (
+    ComprehensiveRiskConfig,
+)
 
 
 class DataRetrievalConfig(BaseModel):
@@ -163,6 +165,7 @@ class SimulatedBrokerConfig(BaseModel):
             raise ValueError(f"slippage_model must be one of {valid_models}")
         return v
 
+
 class PerformanceConfig(BaseModel):
     """Performance analysis configuration settings."""
 
@@ -174,6 +177,7 @@ class PerformanceConfig(BaseModel):
     risk_free_rate: float = Field(default=0.02, description="Risk-free rate")
     benchmark_enabled: bool = Field(default=False, description="Whether benchmark is enabled")
     benchmark_symbol: str = Field(default="SPY", description="Benchmark symbol")
+
 
 class BacktesterConfig(BaseModel):
     """Main configuration class for the backtester."""
@@ -254,5 +258,3 @@ def reset_config() -> None:
     """Reset the global configuration to defaults."""
     global _global_config
     _global_config = BacktesterConfig()
-
-

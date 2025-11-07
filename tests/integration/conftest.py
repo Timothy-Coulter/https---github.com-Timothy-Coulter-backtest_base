@@ -20,7 +20,7 @@ from backtester.core.performance import PerformanceAnalyzer
 from backtester.data.data_retrieval import DataRetrieval, DataRetrievalConfig
 from backtester.execution.broker import SimulatedBroker
 from backtester.portfolio.portfolio import DualPoolPortfolio
-from backtester.portfolio.risk_manager import RiskManager
+from backtester.risk_management.risk_control_manager import RiskControlManager
 from backtester.strategy.moving_average import DualPoolMovingAverageStrategy
 
 # Mark all tests in this module as integration tests
@@ -382,7 +382,7 @@ def backtester_components(integration_test_config: Mock) -> dict[str, Any]:
             logger=logger,
         )
 
-        components['risk_manager'] = RiskManager(
+        components['risk_manager'] = RiskControlManager(
             max_portfolio_var=integration_test_config.risk.max_portfolio_risk,
             max_single_position=integration_test_config.risk.max_position_size,
             max_leverage=integration_test_config.risk.max_leverage,
