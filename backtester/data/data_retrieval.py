@@ -8,69 +8,7 @@ import pandas as pd
 from findatapy.market import Market, MarketDataGenerator, MarketDataRequest
 from findatapy.timeseries import DataQuality
 from findatapy.util import LoggerManager
-from pydantic import BaseModel, Field
-
-
-class DataRetrievalConfig(BaseModel):
-    """Configuration class for data retrieval parameters using pydantic BaseModel.
-
-    This class defines all the parameters needed to configure a data retrieval request,
-    inheriting from pydantic.BaseModel for validation and serialization.
-    """
-
-    # Data source configuration
-    data_source: str = Field(
-        default="yahoo", description="Data source (e.g., yahoo, bloomberg, fred)"
-    )
-    start_date: str | Any = Field(default="year", description="Start date for data retrieval")
-    finish_date: str | Any | None = Field(
-        default=None, description="Finish date for data retrieval"
-    )
-
-    # Ticker and field configuration
-    tickers: str | list[str] | None = Field(default=None, description="List of ticker symbols")
-    fields: list[str] = Field(default=["close"], description="List of fields to retrieve")
-    vendor_tickers: list[str] | None = Field(
-        default=None, description="Vendor-specific ticker symbols"
-    )
-    vendor_fields: list[str] | None = Field(default=None, description="Vendor-specific field names")
-
-    # Frequency and granularity
-    freq: str = Field(default="daily", description="Data frequency (daily, intraday, etc.)")
-    gran_freq: str | None = Field(default=None, description="Granular frequency")
-    freq_mult: int = Field(default=1, description="Frequency multiplier")
-
-    # Cache and environment configuration
-    cache_algo: str = Field(default="internet_load_return", description="Cache algorithm to use")
-    environment: str | None = Field(default=None, description="Data environment (prod, backtest)")
-    cut: str = Field(default="NYC", description="Cut time for data")
-
-    # API keys and authentication
-    fred_api_key: str | None = Field(default=None, description="FRED API key")
-    alpha_vantage_api_key: str | None = Field(default=None, description="Alpha Vantage API key")
-    eikon_api_key: str | None = Field(default=None, description="Eikon API key")
-
-    # Additional parameters
-    category: str | None = Field(default=None, description="Data category")
-    dataset: str | None = Field(default=None, description="Dataset name")
-    trade_side: str = Field(default="trade", description="Trade side (trade, bid, ask)")
-    resample: str | None = Field(default=None, description="Resample frequency")
-    resample_how: str = Field(default="last", description="Resample method")
-
-    # Threading and performance
-    split_request_chunks: int = Field(default=0, description="Split request into chunks")
-    list_threads: int = Field(default=1, description="Number of threads for data loading")
-
-    # Cache behavior
-    push_to_cache: bool = Field(default=True, description="Whether to push data to cache")
-    overrides: dict[str, Any] = Field(default_factory=dict, description="Data overrides")
-
-    class Config:
-        """Pydantic configuration."""
-
-        use_enum_values = True
-        arbitrary_types_allowed = True
-
+from backtester.core.config import DataRetrievalConfig
 
 class DataRetrieval:
     """Data retrieval class that implements cache-first logic.
