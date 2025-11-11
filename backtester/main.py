@@ -17,12 +17,42 @@ import pandas as pd
 
 # Import backtester components
 from backtester.core.backtest_engine import BacktestEngine
-from backtester.core.config import BacktesterConfig, set_config
+from backtester.core.config import BacktesterConfig, DataRetrievalConfig, set_config
 from backtester.core.logger import get_backtester_logger
-from backtester.data.data_handler import DataHandler, get_data
+from backtester.data.data_retrieval import DataRetrieval
 
 run_portfolio_simulation = None
 src_get_data = None
+
+
+def get_data(ticker: str, start_date: str, end_date: str, interval: str = "1d") -> pd.DataFrame:
+    """Get market data using DataRetrieval class.
+
+    Args:
+        ticker: Ticker symbol
+        start_date: Start date
+        end_date: End date
+        interval: Data interval (e.g., "1d", "1mo")
+
+    Returns:
+        DataFrame with market data
+    """
+    config = DataRetrievalConfig(
+        tickers=ticker,
+        start_date=start_date,
+        finish_date=end_date,
+        freq="daily",
+        fields=["close", "open", "high", "low", "volume"],
+    )
+
+    # Convert interval to appropriate frequency
+    if interval == "1mo":
+        config.freq = "monthly"
+        config.resample = "1M"
+
+    data_retrieval = DataRetrieval(config)
+    return data_retrieval.get_data()
+
 
 warnings.filterwarnings('ignore')
 
@@ -527,9 +557,7 @@ def run_backtest(
     Returns:
         Dict containing backtest results
     """
-    from backtester.data.data_handler import get_data
-
-    # Get data
+    # Get data using the defined get_data function
     data = get_data(symbol, start_date, end_date, interval)
 
     # Run modular backtest - variables created but not needed for this simplified interface
@@ -644,7 +672,7 @@ class BacktesterApp:
 
     def __init__(self) -> None:
         """Initialize the backtester application."""
-        self.data_handler = DataHandler()
+        self.data_handler = DataRetrieval(DataRetrievalConfig())
         self.backtest_engine = BacktestEngine()
         self.strategy_factory = StrategyFactory()
         self.portfolio_factory = PortfolioFactory()
@@ -841,8 +869,6 @@ class BacktesterApp:
 
 
 __all__ = [
-    'DataHandler',
-    'get_data',
     'ModularBacktester',
     'StrategyFactory',
     'PortfolioFactory',
