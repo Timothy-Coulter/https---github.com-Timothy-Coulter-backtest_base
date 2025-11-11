@@ -48,59 +48,147 @@ class PositionSizer:
             Position size as fraction of portfolio
         """
         # Handle zero or very small portfolio value
-        if portfolio_value <= 0 or account_value is not None and account_value <= 0:
+        if portfolio_value <= 0 or (account_value is not None and account_value <= 0):
             return 0.0
 
         if account_value is None:
             account_value = portfolio_value
 
-        # Apply conviction to conviction multiplier (for backward compatibility)
-        conviction_factor = conviction
+        # Get base position size
+        position_size = self._get_base_position_size()
 
-        # Base position size
-        position_size = self.config.max_position_size
+        # Apply method-specific sizing
+        position_size = self._apply_method_sizing(
+            position_size, account_value, entry_price, volatility, conviction
+        )
 
-        # Apply method-specific adjustments
-        if self.config.sizing_method == SizingMethod.RISK_BASED:
-            position_size = self._calculate_risk_based_size(account_value, entry_price, volatility)
-            # For risk-based, also apply conviction factors from config
-            conviction_factor = 1.0
-            if conviction <= 0.6:
-                conviction_factor = self.config.conviction_factors.get('low', 0.7)
-            elif conviction <= 1.2:
-                conviction_factor = self.config.conviction_factors.get('medium', 1.0)
-            else:
-                conviction_factor = self.config.conviction_factors.get('high', 1.3)
-            position_size *= conviction_factor
-        elif self.config.sizing_method == SizingMethod.VOLATILITY_ADJUSTED:
-            position_size = self._calculate_volatility_adjusted_size(
-                account_value, entry_price, volatility
-            )
-        elif self.config.sizing_method == SizingMethod.CORRELATION_ADJUSTED:
-            position_size = self._calculate_correlation_adjusted_size(account_value, entry_price)
-        elif self.config.sizing_method == SizingMethod.KELLY:
-            position_size = self._calculate_kelly_size(account_value)
-        else:
-            # Fixed percentage method - use direct conviction multiplier
-            position_size = position_size * conviction_factor
+        # Apply volatility adjustment
+        position_size = self._apply_volatility_adjustment(position_size, volatility)
 
-        # Apply volatility adjustment if enabled (to all methods except risk-based which applies it internally)
-        if self.config.volatility_adjustment and volatility > 0:
-            if self.config.sizing_method != SizingMethod.RISK_BASED:
-                volatility_factor = max(0.1, 1.0 - volatility * 5)
-                position_size *= volatility_factor
-
-        # Apply bounds (but not to risk-based sizing which has its own bounds)
-        if self.config.sizing_method != SizingMethod.RISK_BASED:
-            position_size = max(
-                self.config.min_position_size, min(position_size, self.config.max_position_size)
-            )
+        # Apply bounds
+        position_size = self._apply_bounds(position_size)
 
         self.logger.debug(
             f"Position size calculated: {position_size:.3f} "
             f"(conviction: {conviction:.2f}, vol: {volatility:.3f})"
         )
 
+        return position_size
+
+    def _get_base_position_size(self) -> float:
+        """Get base position size from config.
+
+        Returns:
+            Base position size
+        """
+        return self.config.max_position_size
+
+    def _apply_method_sizing(
+        self,
+        position_size: float,
+        account_value: float,
+        entry_price: float,
+        volatility: float,
+        conviction: float,
+    ) -> float:
+        """Apply method-specific position sizing logic.
+
+        Args:
+            position_size: Current position size
+            account_value: Account value
+            entry_price: Entry price
+            volatility: Market volatility
+            conviction: Conviction factor
+
+        Returns:
+            Adjusted position size
+        """
+        if self.config.sizing_method == SizingMethod.RISK_BASED:
+            return self._apply_risk_based_sizing(account_value, entry_price, volatility, conviction)
+        elif self.config.sizing_method == SizingMethod.VOLATILITY_ADJUSTED:
+            return self._calculate_volatility_adjusted_size(account_value, entry_price, volatility)
+        elif self.config.sizing_method == SizingMethod.CORRELATION_ADJUSTED:
+            return self._calculate_correlation_adjusted_size(account_value, entry_price)
+        elif self.config.sizing_method == SizingMethod.KELLY:
+            return self._calculate_kelly_size(account_value)
+        else:
+            # Fixed percentage method
+            return position_size * conviction
+
+    def _apply_risk_based_sizing(
+        self,
+        account_value: float,
+        entry_price: float,
+        volatility: float,
+        conviction: float,
+    ) -> float:
+        """Apply risk-based sizing with conviction factors.
+
+        Args:
+            account_value: Account value
+            entry_price: Entry price
+            volatility: Market volatility
+            conviction: Conviction factor
+
+        Returns:
+            Risk-based position size
+        """
+        position_size = self._calculate_risk_based_size(account_value, entry_price, volatility)
+
+        # Apply conviction factors from config
+        conviction_factor = self._get_conviction_factor(conviction)
+        position_size *= conviction_factor
+
+        return position_size
+
+    def _get_conviction_factor(self, conviction: float) -> float:
+        """Get conviction factor based on conviction level.
+
+        Args:
+            conviction: Conviction value
+
+        Returns:
+            Conviction factor
+        """
+        if conviction <= 0.6:
+            return self.config.conviction_factors.get('low', 0.7)
+        elif conviction <= 1.2:
+            return self.config.conviction_factors.get('medium', 1.0)
+        else:
+            return self.config.conviction_factors.get('high', 1.3)
+
+    def _apply_volatility_adjustment(self, position_size: float, volatility: float) -> float:
+        """Apply volatility adjustment if enabled.
+
+        Args:
+            position_size: Current position size
+            volatility: Market volatility
+
+        Returns:
+            Volatility-adjusted position size
+        """
+        if (
+            self.config.volatility_adjustment
+            and volatility > 0
+            and self.config.sizing_method != SizingMethod.RISK_BASED
+        ):
+            volatility_factor = max(0.1, 1.0 - volatility * 5)
+            position_size *= volatility_factor
+        return position_size
+
+    def _apply_bounds(self, position_size: float) -> float:
+        """Apply position size bounds.
+
+        Args:
+            position_size: Current position size
+
+        Returns:
+            Bounded position size
+        """
+        if self.config.sizing_method != SizingMethod.RISK_BASED:
+            return max(
+                self.config.min_position_size, min(position_size, self.config.max_position_size)
+            )
         return position_size
 
     def _calculate_risk_based_size(
@@ -132,10 +220,7 @@ class PositionSizer:
         position_size = position_value / account_value
 
         # Apply bounds for consistency with other methods
-        return max(
-            self.config.min_position_size,
-            min(position_size, self.config.max_position_size)
-        )
+        return max(self.config.min_position_size, min(position_size, self.config.max_position_size))
 
     def _calculate_volatility_adjusted_size(
         self, account_value: float, entry_price: float, volatility: float
@@ -319,7 +404,7 @@ class PositionSizer:
 
         # Convert to fraction of portfolio
         position_size = position_size / account_value
-        
+
         # Apply bounds as fractions
         max_size = self.config.max_position_size
         min_size = self.config.min_position_size

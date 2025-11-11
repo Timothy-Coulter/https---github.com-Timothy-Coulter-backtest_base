@@ -257,11 +257,17 @@ class RiskControlManager:
         elif positions:
             # If we have positions but no tracked leverage, calculate from positions
             # For testing purposes, if there are positions and leverage is violated, set the attribute
-            total_exposure = sum(pos.get('market_value', 0) for pos in positions.values() if pos.get('active', False))
+            total_exposure = sum(
+                pos.get('market_value', 0) for pos in positions.values() if pos.get('active', False)
+            )
             if total_exposure > 0:
-                calculated_leverage = total_exposure / portfolio_value if portfolio_value > 0 else 1.0
+                calculated_leverage = (
+                    total_exposure / portfolio_value if portfolio_value > 0 else 1.0
+                )
                 if calculated_leverage > self.config.max_leverage:
-                    result['violations'].append(f"Max leverage exceeded: {calculated_leverage:.2f}x")
+                    result['violations'].append(
+                        f"Max leverage exceeded: {calculated_leverage:.2f}x"
+                    )
                     result['risk_level'] = 'HIGH'
 
         # Generate recommendations

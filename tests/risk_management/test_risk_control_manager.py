@@ -26,9 +26,11 @@ from backtester.risk_management.component_configs.risk_monitoring_config import 
 )
 from backtester.risk_management.component_configs.stop_loss_config import (
     StopLossConfig,
+    StopLossType,
 )
 from backtester.risk_management.component_configs.take_profit_config import (
     TakeProfitConfig,
+    TakeProfitType,
 )
 from backtester.risk_management.risk_control_manager import RiskControlManager
 
@@ -154,7 +156,7 @@ class TestComprehensiveRiskConfig:
     def test_get_stop_loss_params_with_config(self) -> None:
         """Test get_stop_loss_params with stop loss config."""
         stop_loss_config = StopLossConfig(
-            stop_loss_type="TRAILING",
+            stop_loss_type=StopLossType.TRAILING,
             stop_loss_value=0.025,
         )
         config = ComprehensiveRiskConfig(stop_loss_config=stop_loss_config)
@@ -180,7 +182,7 @@ class TestComprehensiveRiskConfig:
     def test_get_take_profit_params_with_config(self) -> None:
         """Test get_take_profit_params with take profit config."""
         take_profit_config = TakeProfitConfig(
-            take_profit_type="FIXED",
+            take_profit_type=TakeProfitType.FIXED,
             take_profit_value=0.08,
         )
         config = ComprehensiveRiskConfig(take_profit_config=take_profit_config)
@@ -474,7 +476,7 @@ class TestRiskControlManager:
             "MSFT": {
                 'market_value': 300000.0,  # 3x leverage
                 'active': True,
-            }
+            },
         }
 
         result = manager.check_portfolio_risk(portfolio_value, positions)

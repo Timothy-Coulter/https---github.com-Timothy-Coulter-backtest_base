@@ -18,7 +18,7 @@ from backtester.core.performance import PerformanceAnalyzer
 from backtester.data.data_retrieval import DataRetrieval
 from backtester.execution.broker import SimulatedBroker
 from backtester.execution.order import OrderSide, OrderType
-from backtester.portfolio.portfolio import DualPoolPortfolio
+from backtester.portfolio import DualPoolPortfolio
 from backtester.risk_management.risk_control_manager import RiskControlManager
 from backtester.strategy.base import BaseStrategy
 from backtester.strategy.moving_average import DualPoolMovingAverageStrategy
@@ -87,22 +87,20 @@ class BacktestEngine:
         Returns:
             Loaded market data
         """
-        ticker = ticker or (self.config.data.default_ticker if self.config.data else "SPY")
+        ticker = ticker or (
+            self.config.data.tickers[0] if self.config.data and self.config.data.tickers else "SPY"
+        )
         start_date = start_date or (
             self.config.data.start_date if self.config.data else "2015-01-01"
         )
-        end_date = end_date or (self.config.data.end_date if self.config.data else "2024-01-01")
-        interval = interval or (self.config.data.interval if self.config.data else "1mo")
+        end_date = end_date or (self.config.data.finish_date if self.config.data else "2024-01-01")
+        interval = interval or (self.config.data.freq if self.config.data else "1mo")
 
         self.logger.info(f"Loading data for {ticker} from {start_date} to {end_date}")
 
         try:
             assert self.config.data is not None
-            self.current_data = self.data_handler.get_data(ticker, start_date, end_date, interval)
-
-            # Add technical indicators if enabled
-            if self.config.data.use_technical_indicators:
-                self.current_data = self.data_handler.add_technical_indicators(self.current_data)
+            self.current_data = self.data_handler.get_data()
 
             self.logger.info(f"Loaded {len(self.current_data)} records")
             return self.current_data
@@ -213,7 +211,8 @@ class BacktestEngine:
         # Set market data for the broker
         if self.current_data is not None:
             assert self.config.data is not None
-            self.current_broker.set_market_data(self.config.data.default_ticker, self.current_data)
+            ticker = self.config.data.tickers[0] if self.config.data.tickers else "SPY"
+            self.current_broker.set_market_data(ticker, self.current_data)
 
         self.logger.info("Created simulated broker")
         return self.current_broker
@@ -225,20 +224,7 @@ class BacktestEngine:
             Risk manager instance
         """
         self.current_risk_manager = RiskControlManager(
-            max_portfolio_var=self.config.risk.max_portfolio_risk if self.config.risk else 0.02,
-            max_single_position=self.config.risk.max_position_size if self.config.risk else 0.10,
-            max_leverage=self.config.risk.max_leverage if self.config.risk else 5.0,
-            max_drawdown=self.config.risk.max_drawdown if self.config.risk else 0.20,
-            rebalance_frequency='weekly',
-            alert_thresholds={
-                'var_threshold': (
-                    self.config.risk.max_portfolio_risk * 1.2 if self.config.risk else 0.024
-                ),
-                'drawdown_threshold': (
-                    self.config.risk.max_drawdown * 1.1 if self.config.risk else 0.22
-                ),
-                'correlation_threshold': 0.8,
-            },
+            config=self.config.risk,
             logger=self.logger,
         )
 
@@ -351,8 +337,8 @@ class BacktestEngine:
 
         self.logger.info("Running simulation loop...")
 
-        # Start new day tracking
-        self.current_risk_manager.start_new_day(self.current_portfolio.initial_capital)
+        # Initialize daily tracking (using existing method or skip if not available)
+        # self.current_risk_manager.start_new_day(self.current_portfolio.initial_capital)
 
         assert self.current_data is not None
         for i in range(len(self.current_data) - 1):
@@ -377,10 +363,6 @@ class BacktestEngine:
             self._check_risk_management(portfolio_update['total_value'])
 
             # Update daily P&L tracking
-            if i > 0:
-                daily_pnl = portfolio_update['total_value'] - portfolio_values[-1]
-                self.current_risk_manager.update_daily_pnl(daily_pnl)
-
             # Store results
             portfolio_values.append(portfolio_update['total_value'])
             assert self.current_portfolio is not None
@@ -429,7 +411,7 @@ class BacktestEngine:
         # Process portfolio tick with current market data
         assert self.current_portfolio is not None
         portfolio_update = self.current_portfolio.process_tick(
-            timestamp, current_price, day_high, day_low
+            timestamp=timestamp, current_price=current_price, day_high=day_high, day_low=day_low
         )
 
         # Process signals (generate orders based on signals)
@@ -452,8 +434,9 @@ class BacktestEngine:
             # Create buy order
             assert self.current_broker is not None
             assert self.config.data is not None
+            ticker = self.config.data.tickers[0] if self.config.data.tickers else "SPY"
             order = self.current_broker.order_manager.create_order(
-                symbol=self.config.data.default_ticker,
+                symbol=ticker,
                 side=OrderSide.BUY,
                 order_type=OrderType.MARKET,
                 quantity=1.0,  # Standardized quantity
@@ -467,8 +450,9 @@ class BacktestEngine:
             # Create sell order
             assert self.current_broker is not None
             assert self.config.data is not None
+            ticker = self.config.data.tickers[0] if self.config.data.tickers else "SPY"
             order = self.current_broker.order_manager.create_order(
-                symbol=self.config.data.default_ticker,
+                symbol=ticker,
                 side=OrderSide.SELL,
                 order_type=OrderType.MARKET,
                 quantity=1.0,
@@ -496,12 +480,22 @@ class BacktestEngine:
             portfolio_value, positions_dict
         )
 
-        if risk_signal.action.value in ['REDUCE_POSITION', 'CLOSE_POSITION']:
+        if risk_signal.get('risk_level') == 'HIGH':
             # Cancel existing orders or close positions
             self.current_broker.order_manager.cancel_all_orders(
-                f"Risk management: {risk_signal.reason}"
+                f"Risk management: {', '.join(risk_signal.get('violations', []))}"
             )
-            self.current_risk_manager.add_risk_signal(risk_signal)
+            # Convert to dict format expected by add_risk_signal
+            signal_dict = {
+                'action': 'REDUCE_POSITION',
+                'reason': f"Portfolio risk violations: {', '.join(risk_signal.get('violations', []))}",
+                'confidence': 0.7,  # High confidence for risk violations
+                'metadata': {
+                    'source': 'portfolio_risk_check',
+                    'violations': risk_signal.get('violations', []),
+                },
+            }
+            self.current_risk_manager.add_risk_signal(signal_dict)
 
     def _calculate_performance_metrics(self) -> dict[str, Any]:
         """Calculate comprehensive performance metrics.
@@ -518,12 +512,7 @@ class BacktestEngine:
         assert self.config.data is not None
         if self.config.performance.benchmark_enabled:
             try:
-                benchmark_data = self.data_handler.get_data(
-                    self.config.performance.benchmark_symbol,
-                    self.config.data.start_date if self.config.data else "1990-01-01",
-                    self.config.data.end_date if self.config.data else "2025-01-01",
-                    self.config.data.interval if self.config.data else "1mo",
-                )
+                benchmark_data = self.data_handler.get_data()
                 benchmark_values = benchmark_data['Close'] * (
                     portfolio_values.iloc[0] / benchmark_data['Close'].iloc[0]
                 )

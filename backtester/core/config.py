@@ -109,14 +109,92 @@ class PortfolioConfig(BaseModel):
         arbitrary_types_allowed=True,
     )
 
+    # Core portfolio parameters
     initial_capital: float = Field(default=100.0, description="Initial capital")
-    maintenance_margin: float = Field(default=0.5, description="Maintenance margin")
     commission_rate: float = Field(default=0.001, description="Commission rate")
     interest_rate_daily: float = Field(default=0.00025, description="Daily interest rate")
     spread_rate: float = Field(default=0.0002, description="Spread rate")
     slippage_std: float = Field(default=0.0005, description="Slippage standard deviation")
     funding_enabled: bool = Field(default=True, description="Whether funding is enabled")
     tax_rate: float = Field(default=0.45, description="Tax rate")
+
+    # General Portfolio specific
+    max_positions: int = Field(default=10, description="Maximum number of concurrent positions")
+
+    # Dual Pool Portfolio specific
+    leverage_base: float = Field(default=1.0, description="Leverage factor for base pool")
+    leverage_alpha: float = Field(default=3.0, description="Leverage factor for alpha pool")
+    base_to_alpha_split: float = Field(default=0.2, description="Base to alpha split ratio")
+    alpha_to_base_split: float = Field(default=0.2, description="Alpha to base split ratio")
+    stop_loss_base: float = Field(default=0.025, description="Base stop loss percentage")
+    stop_loss_alpha: float = Field(default=0.025, description="Alpha stop loss percentage")
+    take_profit_target: float = Field(default=0.10, description="Take profit target percentage")
+    maintenance_margin: float = Field(
+        default=0.5, description="Maintenance margin for leveraged positions"
+    )
+    max_total_leverage: float = Field(
+        default=4.0, description="Maximum total portfolio leverage allowed"
+    )
+    cash: float = Field(default=0.0, description="Cash allocation for the portfolio")
+
+    @field_validator('base_to_alpha_split', 'alpha_to_base_split')
+    @classmethod
+    def validate_split_ratios(cls, v: float) -> float:
+        """Validate split ratios are between 0 and 1."""
+        if not 0 <= v <= 1:
+            raise ValueError("Split ratios must be between 0 and 1")
+        return v
+
+    @field_validator('leverage_base', 'leverage_alpha')
+    @classmethod
+    def validate_leverage(cls, v: float) -> float:
+        """Validate leverage is positive."""
+        if v <= 0:
+            raise ValueError("Leverage must be positive")
+        return v
+
+    def create_general_portfolio(self) -> dict[str, Any]:
+        """Create a dictionary of parameters for GeneralPortfolio initialization.
+
+        Returns:
+            Dictionary of parameters for GeneralPortfolio
+        """
+        return {
+            'initial_capital': self.initial_capital,
+            'commission_rate': self.commission_rate,
+            'interest_rate_daily': self.interest_rate_daily,
+            'spread_rate': self.spread_rate,
+            'slippage_std': self.slippage_std,
+            'funding_enabled': self.funding_enabled,
+            'tax_rate': self.tax_rate,
+            'max_positions': self.max_positions,
+        }
+
+    def create_dual_pool_portfolio(self) -> dict[str, Any]:
+        """Create a dictionary of parameters for DualPoolPortfolio initialization.
+
+        Returns:
+            Dictionary of parameters for DualPoolPortfolio
+        """
+        return {
+            'initial_capital': self.initial_capital,
+            'leverage_base': self.leverage_base,
+            'leverage_alpha': self.leverage_alpha,
+            'base_to_alpha_split': self.base_to_alpha_split,
+            'alpha_to_base_split': self.alpha_to_base_split,
+            'stop_loss_base': self.stop_loss_base,
+            'stop_loss_alpha': self.stop_loss_alpha,
+            'take_profit_target': self.take_profit_target,
+            'maintenance_margin': self.maintenance_margin,
+            'commission_rate': self.commission_rate,
+            'interest_rate_daily': self.interest_rate_daily,
+            'spread_rate': self.spread_rate,
+            'slippage_std': self.slippage_std,
+            'funding_enabled': self.funding_enabled,
+            'max_total_leverage': self.max_total_leverage,
+            'cash': self.cash,
+            'tax_rate': self.tax_rate,
+        }
 
 
 class ExecutionConfig(BaseModel):

@@ -14,12 +14,12 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-from backtester.data.data_handler import DataHandler, get_data
 
 # Import backtester components
 from backtester.core.backtest_engine import BacktestEngine
 from backtester.core.config import BacktesterConfig, set_config
 from backtester.core.logger import get_backtester_logger
+from backtester.data.data_handler import DataHandler, get_data
 
 run_portfolio_simulation = None
 src_get_data = None
@@ -467,7 +467,7 @@ class PortfolioFactory:
         Raises:
             ValueError: If portfolio_type is not supported
         """
-        from backtester.portfolio.portfolio import GeneralPortfolio
+        from backtester.portfolio import GeneralPortfolio
 
         if portfolio_type == "general":
             return GeneralPortfolio(initial_capital=getattr(config, 'initial_capital', 100000))

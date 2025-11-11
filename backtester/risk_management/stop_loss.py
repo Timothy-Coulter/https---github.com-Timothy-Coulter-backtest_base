@@ -47,8 +47,6 @@ class StopLoss:
         self.trigger_price: float | None = None
         self.trigger_time: datetime | None = None
         self.trailing_stop_pct = self.config.trailing_stop_pct
-        # Add missing attributes for test compatibility
-        self.stop_price: float | None = None
 
     def initialize_position(self, entry_price: float, timestamp: pd.Timestamp) -> None:
         """Initialize stop loss for a new position.
@@ -213,17 +211,13 @@ class StopLoss:
 
         elif self.config.stop_loss_type == StopLossType.TRAILING_PERCENTAGE:
             trail_stop = reference_price * (1 - self.config.trail_distance)
-            
+
             # Ensure we only move the stop up (never down)
             if self.stop_price is not None and self.stop_price > trail_stop:
                 # Keep the higher stop price (don't move stop down)
                 return self.stop_price
             else:
                 return trail_stop
-
-        # This should not be reached with current StopLossType enum
-        # but provide a safe fallback
-        return reference_price * 0.95  # Default 5% stop loss
 
     def get_status(self) -> dict[str, Any]:
         """Get current stop loss status.
@@ -273,9 +267,10 @@ class StopLoss:
         """
         if side.lower() == 'short':
             # For short positions, stop loss is above entry price
-            if self.config.stop_loss_type == StopLossType.FIXED:
-                return entry_price * (1 + self.config.stop_loss_value)
-            elif self.config.stop_loss_type == StopLossType.PERCENTAGE:
+            if (
+                self.config.stop_loss_type == StopLossType.FIXED
+                or self.config.stop_loss_type == StopLossType.PERCENTAGE
+            ):
                 return entry_price * (1 + self.config.stop_loss_value)
             elif self.config.stop_loss_type == StopLossType.PRICE:
                 return self.config.stop_loss_value

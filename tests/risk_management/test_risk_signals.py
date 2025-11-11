@@ -245,7 +245,7 @@ class TestRiskSignalInitialization:
 
         assert "日本語" in signal.reason
         assert "🚨" in signal.reason
-        assert signal.metadata["message"] == "描述 高リスク"
+        assert signal.metadata is not None and signal.metadata["message"] == "描述 高リスク"
 
 
 class TestRiskMetricInitialization:

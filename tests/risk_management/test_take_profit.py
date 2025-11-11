@@ -746,7 +746,7 @@ class TestTakeProfit:
         assert take_profit.lowest_price == float('inf')
         assert take_profit.is_active is True
         assert take_profit.triggered is False
-        assert take_profit.trigger_price is None
+        assert take_profit.trigger_price is None  # type: ignore[unreachable]
         assert take_profit.target_price is None
 
     def test_setup_trailing_target_long(self, default_config: TakeProfitConfig) -> None:
@@ -1087,7 +1087,7 @@ class TestTakeProfit:
         result3 = take_profit.update(106.0, sample_timestamp)  # 6% gain triggers
         assert result3['triggered'] is True
         assert take_profit.is_active is False
-        assert take_profit.triggered is True
+        assert take_profit.triggered is True  # type: ignore[unreachable]
         assert abs(result3['pnl_pct'] - 0.06) < 0.01
         # End of integration test
 
@@ -1123,7 +1123,7 @@ class TestTakeProfit:
         # Trigger and check
         take_profit.trigger()
         assert take_profit.triggered is True
-        assert take_profit.trigger_price is not None
+        assert take_profit.trigger_price is not None  # type: ignore[unreachable]
         # End of compatibility test
 
     def test_config_with_all_validation_constraints(self) -> None:

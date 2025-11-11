@@ -7,7 +7,7 @@ with advanced risk management, strategy implementation, and performance analysis
 # Core exports
 from backtester.core.backtest_engine import BacktestEngine
 from backtester.core.config import BacktesterConfig
-from backtester.portfolio.portfolio import DualPoolPortfolio
+from backtester.portfolio import DualPoolPortfolio
 from backtester.strategy.base import BaseStrategy
 from backtester.strategy.moving_average import DualPoolMovingAverageStrategy
 

@@ -731,7 +731,7 @@ class TestStopLoss:
         assert stop_loss.is_active is True
         assert stop_loss.stop_triggered is False
         assert stop_loss.triggered is False
-        assert stop_loss.trigger_price is None
+        assert stop_loss.trigger_price is None  # type: ignore[unreachable]
         assert stop_loss.stop_price is None
 
     def test_setup_trailing_stop_long(self, default_config: StopLossConfig) -> None:
@@ -958,7 +958,7 @@ class TestStopLoss:
         result3 = stop_loss.update(94.0, sample_timestamp)  # 6% drop triggers 5% stop
         assert result3['triggered'] is True
         assert stop_loss.is_active is False
-        assert stop_loss.triggered is True
+        assert stop_loss.triggered is True  # type: ignore[unreachable]
         assert abs(result3['pnl_pct'] - (-0.06)) < 0.01
 
     def test_backtest_compatibility_attributes(
@@ -994,7 +994,7 @@ class TestStopLoss:
         stop_loss.trigger()
         assert stop_loss.triggered is True
         # triggered_price is only set during update() when price triggers
-        assert stop_loss.triggered_price is None
+        assert stop_loss.triggered_price is None  # type: ignore[unreachable]
 
     def test_config_with_all_validation_constraints(self) -> None:
         """Test that config accepts all valid constraint combinations."""

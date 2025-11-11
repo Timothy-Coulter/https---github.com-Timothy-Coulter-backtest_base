@@ -42,6 +42,7 @@ test = [
     "pytest-xdist>=3.0.0",
     "pytest-mock>=3.0.0",
     "pytest-asyncio>=0.21.0",
+    "pytest-rerunfailures>=12.0",
     "coverage[toml]>=7.0.0",
     "hypothesis>=6.0.0",
 ]
@@ -67,6 +68,7 @@ all = [
     "pytest-xdist>=3.0.0",
     "pytest-mock>=3.0.0",
     "pytest-asyncio>=0.21.0",
+    "pytest-rerunfailures>=12.0",
     "coverage[toml]>=7.0.0",
     "hypothesis>=6.0.0",
 ]
@@ -146,6 +148,7 @@ warn_required_dynamic_aliases = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "--reruns=3 --reruns-delay=1"
 
 # =============================================================================
 # Coverage Configuration

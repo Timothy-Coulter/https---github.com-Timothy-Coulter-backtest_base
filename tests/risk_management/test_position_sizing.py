@@ -638,7 +638,7 @@ class TestPositionSizer:
         config = PositionSizingConfig(
             sizing_method=SizingMethod.RISK_BASED,
             conviction_factors={'low': 0.2, 'medium': 1.0, 'high': 4.0},
-            max_position_size=0.50  # Large max to avoid constraints
+            max_position_size=0.50,  # Large max to avoid constraints
         )
         sizer = PositionSizer(config=config)
 
