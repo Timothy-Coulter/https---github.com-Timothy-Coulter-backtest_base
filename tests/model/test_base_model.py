@@ -180,7 +180,7 @@ class TestBaseModel:
         model.reset()
 
         assert model._model is None
-        assert not model._is_trained
+        assert not model._is_trained  # type: ignore[unreachable]
         assert model._feature_columns == []
 
     def test_get_model_info(self, sample_config: ModelConfig) -> None:

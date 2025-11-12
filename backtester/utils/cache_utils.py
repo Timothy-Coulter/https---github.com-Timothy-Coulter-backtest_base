@@ -203,7 +203,9 @@ class CacheUtils:
     def _cleanup_memory_cache(self) -> None:
         """Clean up memory cache when it exceeds maximum size."""
         # Sort by access time (oldest first) and remove excess items
-        cache_items = [(key, self._memory_cache_times.get(key) or 0.0) for key in self._memory_cache]
+        cache_items = [
+            (key, self._memory_cache_times.get(key) or 0.0) for key in self._memory_cache
+        ]
         cache_items.sort(key=lambda x: x[1])
 
         # Remove oldest items

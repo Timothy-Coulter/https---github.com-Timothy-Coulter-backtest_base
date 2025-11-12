@@ -291,7 +291,9 @@ class ParameterSpace:
         low = float(param_def.low) if param_def.low is not None else None
         high = float(param_def.high) if param_def.high is not None else None
         if low is None or high is None:
-            raise ValueError(f"Loguniform parameter '{param_def.name}' requires low and high bounds")
+            raise ValueError(
+                f"Loguniform parameter '{param_def.name}' requires low and high bounds"
+            )
         return trial.suggest_float(
             param_def.name,
             low,
@@ -323,47 +325,82 @@ class ParameterSpace:
         """
         grid_space = {}
         for param_def in self._parameters.values():
-            if param_def.param_type == 'float':
-                if param_def.step is not None and param_def.low is not None and param_def.high is not None:
-                    start = float(param_def.low)
-                    stop = float(param_def.high)
-                    step = float(param_def.step)
-                    if step <= 0:
-                        raise ValueError(f"Step must be positive for parameter '{param_def.name}'")
-                    values = []
-                    current = start
-                    while current < stop:
-                        values.append(current)
-                        current += step
-                    grid_space[param_def.name] = values
-                else:
-                    if param_def.low is None or param_def.high is None:
-                        raise ValueError(
-                            f"Float parameter '{param_def.name}' requires low and high for grid space"
-                        )
-                    grid_space[param_def.name] = [float(param_def.low), float(param_def.high)]
-            elif param_def.param_type == 'int':
-                if param_def.low is None or param_def.high is None:
-                    raise ValueError(
-                        f"Int parameter '{param_def.name}' requires low and high for grid space"
-                    )
-                grid_space[param_def.name] = list(
-                    range(int(param_def.low), int(param_def.high))
-                )
-            elif param_def.param_type == 'categorical':
-                if param_def.choices is None:
-                    raise ValueError(
-                        f"Categorical parameter '{param_def.name}' requires choices for grid space"
-                    )
-                grid_space[param_def.name] = list(param_def.choices)
-            elif param_def.param_type == 'loguniform':
-                if param_def.low is None or param_def.high is None:
-                    raise ValueError(
-                        f"Loguniform parameter '{param_def.name}' requires low and high for grid space"
-                    )
-                grid_space[param_def.name] = [float(param_def.low), float(param_def.high)]
-
+            grid_space[param_def.name] = self._create_parameter_grid_values(param_def)
         return grid_space
+
+    def _create_parameter_grid_values(self, param_def: ParameterDefinition) -> list[Any]:
+        """Create grid values for a single parameter definition.
+
+        Args:
+            param_def: Parameter definition
+
+        Returns:
+            List of grid values for the parameter
+        """
+        if param_def.param_type == 'float':
+            return self._create_float_grid_values(param_def)
+        elif param_def.param_type == 'int':
+            return self._create_int_grid_values(param_def)
+        elif param_def.param_type == 'categorical':
+            return self._create_categorical_grid_values(param_def)
+        elif param_def.param_type == 'loguniform':
+            return self._create_loguniform_grid_values(param_def)
+        else:
+            raise ValueError(f"Unknown parameter type: {param_def.param_type}")
+
+    def _create_float_grid_values(self, param_def: ParameterDefinition) -> list[Any]:
+        """Create grid values for float parameters."""
+        if param_def.step is not None and param_def.low is not None and param_def.high is not None:
+            return self._create_stepped_float_values(param_def)
+        else:
+            return self._create_range_float_values(param_def)
+
+    def _create_stepped_float_values(self, param_def: ParameterDefinition) -> list[Any]:
+        """Create stepped float values."""
+        start = float(param_def.low) if param_def.low is not None else 0.0
+        stop = float(param_def.high) if param_def.high is not None else 0.0
+        step = float(param_def.step) if param_def.step is not None else 0.0
+        if step <= 0:
+            raise ValueError(f"Step must be positive for parameter '{param_def.name}'")
+
+        values = []
+        current = start
+        while current < stop:
+            values.append(current)
+            current += step
+        return values
+
+    def _create_range_float_values(self, param_def: ParameterDefinition) -> list[Any]:
+        """Create range float values."""
+        if param_def.low is None or param_def.high is None:
+            raise ValueError(
+                f"Float parameter '{param_def.name}' requires low and high for grid space"
+            )
+        return [float(param_def.low), float(param_def.high)]
+
+    def _create_int_grid_values(self, param_def: ParameterDefinition) -> list[Any]:
+        """Create grid values for integer parameters."""
+        if param_def.low is None or param_def.high is None:
+            raise ValueError(
+                f"Int parameter '{param_def.name}' requires low and high for grid space"
+            )
+        return list(range(int(param_def.low), int(param_def.high)))
+
+    def _create_categorical_grid_values(self, param_def: ParameterDefinition) -> list[Any]:
+        """Create grid values for categorical parameters."""
+        if param_def.choices is None:
+            raise ValueError(
+                f"Categorical parameter '{param_def.name}' requires choices for grid space"
+            )
+        return list(param_def.choices)
+
+    def _create_loguniform_grid_values(self, param_def: ParameterDefinition) -> list[Any]:
+        """Create grid values for loguniform parameters."""
+        if param_def.low is None or param_def.high is None:
+            raise ValueError(
+                f"Loguniform parameter '{param_def.name}' requires low and high for grid space"
+            )
+        return [float(param_def.low), float(param_def.high)]
 
 
 class OptimizationConfig:

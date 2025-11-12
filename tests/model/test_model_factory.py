@@ -426,46 +426,37 @@ class TestModelFactory:
 
     def test_multiple_registrations_same_name(self) -> None:
         """Test registering multiple classes with the same name."""
-
-        class FirstModel(BaseModel[Any]):
-            def __init__(self, config: ModelConfig) -> None:
-                super().__init__(config)
-
-            def prepare_data(self, data: Any) -> Any:
-                raise NotImplementedError
-
-            def train(self, features: Any, target: Any) -> Any:
-                raise NotImplementedError
-
-            def predict(self, features: Any) -> Any:
-                raise NotImplementedError
-
-            def generate_signals(self, data: Any) -> Any:
-                raise NotImplementedError
-
-        class SecondModel(BaseModel[Any]):
-            def __init__(self, config: ModelConfig) -> None:
-                super().__init__(config)
-
-            def prepare_data(self, data: Any) -> Any:
-                raise NotImplementedError
-
-            def train(self, features: Any, target: Any) -> Any:
-                raise NotImplementedError
-
-            def predict(self, features: Any) -> Any:
-                raise NotImplementedError
-
-            def generate_signals(self, data: Any) -> Any:
-                raise NotImplementedError
+        first_model = self._create_mock_model("FirstModel")
+        second_model = self._create_mock_model("SecondModel")
 
         # Register first model
-        ModelFactory.register_model("duplicate_model")(FirstModel)
+        ModelFactory.register_model("duplicate_model")(first_model)
 
         # Register second model with same name - should overwrite
-        ModelFactory.register_model("duplicate_model")(SecondModel)
+        ModelFactory.register_model("duplicate_model")(second_model)
 
-        assert ModelFactory._models["duplicate_model"] is SecondModel
+        assert ModelFactory._models["duplicate_model"] is second_model
+
+    def _create_mock_model(self, model_name: str) -> type[BaseModel[Any]]:
+        """Create a mock model class for testing."""
+
+        class MockModel(BaseModel[Any]):
+            def __init__(self, config: ModelConfig) -> None:
+                super().__init__(config)
+
+            def prepare_data(self, data: Any) -> Any:
+                raise NotImplementedError
+
+            def train(self, features: Any, target: Any) -> Any:
+                raise NotImplementedError
+
+            def predict(self, features: Any) -> Any:
+                raise NotImplementedError
+
+            def generate_signals(self, data: Any) -> Any:
+                raise NotImplementedError
+
+        return MockModel
 
     def test_get_available_models_with_no_frameworks(self) -> None:
         """Test get_available_models when no frameworks are set."""
