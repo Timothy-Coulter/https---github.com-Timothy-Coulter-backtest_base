@@ -9,8 +9,8 @@ from typing import Any
 
 import numpy as np
 
-from .base_portfolio import BasePortfolio
-from .pool_state import PoolState
+from backtester.portfolio.base_portfolio import BasePortfolio
+from backtester.portfolio.pool_state import PoolState
 
 
 class DualPoolPortfolio(BasePortfolio):

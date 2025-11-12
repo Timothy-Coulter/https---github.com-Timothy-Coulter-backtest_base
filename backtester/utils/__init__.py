@@ -4,12 +4,12 @@ This module provides various utility classes and functions for data processing,
 mathematical calculations, formatting, validation, caching, and more.
 """
 
-from .cache_utils import CacheUtils
-from .data_utils import DataUtils
-from .format_utils import FormatUtils, format_currency, format_percentage
+from backtester.utils.cache_utils import CacheUtils
+from backtester.utils.data_utils import DataUtils
+from backtester.utils.format_utils import FormatUtils, format_currency, format_percentage
 
 # Import standalone functions
-from .math_utils import (
+from backtester.utils.math_utils import (
     MathUtils,
     calculate_ema,
     calculate_rsi,
@@ -18,9 +18,9 @@ from .math_utils import (
     rolling_window,
     safe_divide,
 )
-from .string_utils import StringUtils
-from .time_utils import TimeUtils, validate_date_string
-from .validation_utils import ValidationUtils
+from backtester.utils.string_utils import StringUtils
+from backtester.utils.time_utils import TimeUtils, validate_date_string
+from backtester.utils.validation_utils import ValidationUtils
 
 __all__ = [
     'DataUtils',

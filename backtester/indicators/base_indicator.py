@@ -14,9 +14,9 @@ import pandas as pd
 from pydantic import ValidationError
 
 from backtester.core.logger import BacktesterLogger
+from backtester.signal.signal_types import SignalGenerator, SignalType
 
 from .indicator_configs import IndicatorConfig
-from .signal_types import SignalGenerator, SignalType
 
 T = TypeVar('T')
 

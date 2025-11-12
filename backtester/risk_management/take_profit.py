@@ -10,7 +10,10 @@ from typing import Any
 
 import pandas as pd
 
-from .component_configs.take_profit_config import TakeProfitConfig, TakeProfitType
+from backtester.risk_management.component_configs.take_profit_config import (
+    TakeProfitConfig,
+    TakeProfitType,
+)
 
 
 class TakeProfit:

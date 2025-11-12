@@ -4,12 +4,12 @@ This module provides comprehensive optimization functionality using Optuna
 for hyperparameter tuning and strategy optimization.
 """
 
-from .base import BaseOptimization, OptimizationDirection, OptimizationType
-from .objective import ObjectiveResult, OptimizationObjective
-from .parameter_space import OptimizationConfig, ParameterSpace
-from .results import ResultsAnalyzer
-from .runner import OptimizationResult, OptimizationRunner
-from .study_manager import OptunaStudyManager
+from backtester.optmisation.base import BaseOptimization, OptimizationDirection, OptimizationType
+from backtester.optmisation.objective import ObjectiveResult, OptimizationObjective
+from backtester.optmisation.parameter_space import OptimizationConfig, ParameterSpace
+from backtester.optmisation.results import ResultsAnalyzer
+from backtester.optmisation.runner import OptimizationResult, OptimizationRunner
+from backtester.optmisation.study_manager import OptunaStudyManager
 
 __all__ = [
     'OptunaStudyManager',

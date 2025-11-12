@@ -11,8 +11,7 @@ import numpy as np
 import pandas as pd
 
 from backtester.core.config import SimulatedBrokerConfig
-
-from .order import Order, OrderManager, OrderType
+from backtester.execution.order import Order, OrderManager, OrderType
 
 
 class SimulatedBroker:

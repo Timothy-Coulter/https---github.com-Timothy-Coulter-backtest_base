@@ -9,8 +9,8 @@ from typing import Any
 
 import pandas as pd
 
-from .base_portfolio import BasePortfolio
-from .position import Position
+from backtester.portfolio.base_portfolio import BasePortfolio
+from backtester.portfolio.position import Position
 
 
 class GeneralPortfolio(BasePortfolio):

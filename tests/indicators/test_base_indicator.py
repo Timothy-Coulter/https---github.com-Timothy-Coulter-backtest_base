@@ -12,7 +12,7 @@ import pytest
 
 from backtester.indicators.base_indicator import BaseIndicator
 from backtester.indicators.indicator_configs import IndicatorConfig
-from backtester.indicators.signal_types import SignalGenerator, SignalType
+from backtester.signal.signal_types import SignalGenerator, SignalType
 
 
 class TestIndicatorConfig:

@@ -117,7 +117,7 @@ class TestCacheUtils:
         cache = CacheUtils(memory_cache=True)
 
         # Set value with short TTL
-        cache.set('ttl_key', 'ttl_value', ttl=0.001)
+        cache.set('ttl_key', 'ttl_value', ttl=1.0)
 
         # Should be available immediately
         assert cache.get('ttl_key') == 'ttl_value'

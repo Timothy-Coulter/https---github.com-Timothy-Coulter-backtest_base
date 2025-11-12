@@ -10,7 +10,10 @@ from typing import Any
 
 import pandas as pd
 
-from .component_configs.stop_loss_config import StopLossConfig, StopLossType
+from backtester.risk_management.component_configs.stop_loss_config import (
+    StopLossConfig,
+    StopLossType,
+)
 
 
 class StopLoss:

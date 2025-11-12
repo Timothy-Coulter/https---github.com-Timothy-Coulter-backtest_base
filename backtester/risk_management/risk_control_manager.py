@@ -9,12 +9,14 @@ from typing import Any
 
 import pandas as pd
 
-from .component_configs.comprehensive_risk_config import ComprehensiveRiskConfig
-from .position_sizing import PositionSizer
-from .risk_limits import RiskLimits
-from .risk_monitor import RiskMonitor
-from .stop_loss import StopLoss
-from .take_profit import TakeProfit
+from backtester.risk_management.component_configs.comprehensive_risk_config import (
+    ComprehensiveRiskConfig,
+)
+from backtester.risk_management.position_sizing import PositionSizer
+from backtester.risk_management.risk_limits import RiskLimits
+from backtester.risk_management.risk_monitor import RiskMonitor
+from backtester.risk_management.stop_loss import StopLoss
+from backtester.risk_management.take_profit import TakeProfit
 
 
 class RiskControlManager:

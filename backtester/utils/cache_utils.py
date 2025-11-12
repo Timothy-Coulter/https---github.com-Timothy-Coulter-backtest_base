@@ -32,12 +32,12 @@ class CacheUtils:
 
         # Memory cache storage
         self._memory_cache: dict[str, Any] = {}
-        self._memory_cache_times: dict[str, float] = {}
+        self._memory_cache_times: dict[str, float | None] = {}
         self._cache_lock = threading.RLock()
 
         # Statistics
-        self._hits = 0
-        self._misses = 0
+        self._hits: int = 0
+        self._misses: int = 0
 
         # Ensure cache directory exists
         if self.cache_dir:
@@ -66,7 +66,7 @@ class CacheUtils:
             # Memory cache
             if self.memory_cache:
                 self._memory_cache[cache_key] = value
-                self._memory_cache_times[cache_key] = expiry_time  # type: ignore[assignment]
+                self._memory_cache_times[cache_key] = expiry_time
 
                 # Limit memory cache size
                 if len(self._memory_cache) > self.max_memory_items:
@@ -105,7 +105,8 @@ class CacheUtils:
             if self.memory_cache and cache_key in self._memory_cache:
                 expiry_time = self._memory_cache_times.get(cache_key)
 
-                if not expiry_time or current_time < expiry_time:
+                # Treat None (no expiry) as always valid
+                if expiry_time is None or current_time < expiry_time:
                     self._hits += 1
                     return self._memory_cache[cache_key]
                 else:
@@ -191,18 +192,18 @@ class CacheUtils:
         hit_rate = self._hits / total_requests if total_requests > 0 else 0
 
         return {
-            'hits': self._hits,
-            'misses': self._misses,
-            'hit_rate': hit_rate,
-            'total_requests': total_requests,
-            'memory_cache_size': len(self._memory_cache),
-            'max_memory_cache_size': self.max_memory_items,
+            'hits': float(self._hits),
+            'misses': float(self._misses),
+            'hit_rate': float(hit_rate),
+            'total_requests': float(total_requests),
+            'memory_cache_size': float(len(self._memory_cache)),
+            'max_memory_cache_size': float(self.max_memory_items),
         }
 
     def _cleanup_memory_cache(self) -> None:
         """Clean up memory cache when it exceeds maximum size."""
         # Sort by access time (oldest first) and remove excess items
-        cache_items = [(key, self._memory_cache_times.get(key, 0)) for key in self._memory_cache]
+        cache_items = [(key, self._memory_cache_times.get(key) or 0.0) for key in self._memory_cache]
         cache_items.sort(key=lambda x: x[1])
 
         # Remove oldest items

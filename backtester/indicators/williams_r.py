@@ -8,9 +8,9 @@ from typing import Any
 
 import pandas as pd
 
-from .base_indicator import BaseIndicator, IndicatorFactory
-from .indicator_configs import IndicatorConfig
-from .signal_types import SignalType
+from backtester.indicators.base_indicator import BaseIndicator, IndicatorFactory
+from backtester.indicators.indicator_configs import IndicatorConfig
+from backtester.signal.signal_types import SignalType
 
 
 @IndicatorFactory.register("williams_r")

@@ -203,9 +203,11 @@ class ParameterSpace:
         elif param_def.param_type == 'int':
             return self._suggest_int_param(trial, param_def)
         elif param_def.param_type == 'categorical':
+            if param_def.choices is None:
+                raise ValueError(f"Categorical parameter '{param_def.name}' requires choices")
             return trial.suggest_categorical(
                 param_def.name,
-                param_def.choices,  # type: ignore[arg-type]
+                list(param_def.choices),
             )
         elif param_def.param_type == 'loguniform':
             return self._suggest_loguniform_param(trial, param_def)
@@ -221,24 +223,28 @@ class ParameterSpace:
         Returns:
             Suggested float value
         """
+        low = float(param_def.low) if param_def.low is not None else None
+        high = float(param_def.high) if param_def.high is not None else None
+        if low is None or high is None:
+            raise ValueError(f"Float parameter '{param_def.name}' requires low and high bounds")
         if param_def.step is not None:
             return trial.suggest_float(
                 param_def.name,
-                param_def.low,  # type: ignore[arg-type]
-                param_def.high,  # type: ignore[arg-type]
-                step=param_def.step,
+                low,
+                high,
+                step=float(param_def.step),
             )
         elif param_def.q is not None:
             return trial.suggest_float(
                 param_def.name,
-                float(param_def.low),  # type: ignore[arg-type]
-                float(param_def.high),  # type: ignore[arg-type]
+                low,
+                high,
             )
         else:
             return trial.suggest_float(
                 param_def.name,
-                float(param_def.low),  # type: ignore[arg-type]
-                float(param_def.high),  # type: ignore[arg-type]
+                low,
+                high,
                 log=param_def.log,
             )
 
@@ -252,18 +258,22 @@ class ParameterSpace:
         Returns:
             Suggested integer value
         """
+        low = int(param_def.low) if param_def.low is not None else None
+        high = int(param_def.high) if param_def.high is not None else None
+        if low is None or high is None:
+            raise ValueError(f"Int parameter '{param_def.name}' requires low and high bounds")
         if param_def.step is not None:
             return trial.suggest_int(
                 param_def.name,
-                int(param_def.low),  # type: ignore[arg-type]
-                int(param_def.high),  # type: ignore[arg-type]
+                low,
+                high,
                 step=int(param_def.step),
             )
         else:
             return trial.suggest_int(
                 param_def.name,
-                param_def.low,  # type: ignore[arg-type]
-                param_def.high,  # type: ignore[arg-type]
+                low,
+                high,
             )
 
     def _suggest_loguniform_param(
@@ -278,10 +288,14 @@ class ParameterSpace:
         Returns:
             Suggested loguniform value
         """
+        low = float(param_def.low) if param_def.low is not None else None
+        high = float(param_def.high) if param_def.high is not None else None
+        if low is None or high is None:
+            raise ValueError(f"Loguniform parameter '{param_def.name}' requires low and high bounds")
         return trial.suggest_float(
             param_def.name,
-            float(param_def.low),  # type: ignore[arg-type]
-            float(param_def.high),  # type: ignore[arg-type]
+            low,
+            high,
             log=True,
         )
 
@@ -310,20 +324,44 @@ class ParameterSpace:
         grid_space = {}
         for param_def in self._parameters.values():
             if param_def.param_type == 'float':
-                if param_def.step is not None:
-                    grid_space[param_def.name] = list(
-                        range(int(param_def.low), int(param_def.high), param_def.step)  # type: ignore[arg-type]
-                    )
+                if param_def.step is not None and param_def.low is not None and param_def.high is not None:
+                    start = float(param_def.low)
+                    stop = float(param_def.high)
+                    step = float(param_def.step)
+                    if step <= 0:
+                        raise ValueError(f"Step must be positive for parameter '{param_def.name}'")
+                    values = []
+                    current = start
+                    while current < stop:
+                        values.append(current)
+                        current += step
+                    grid_space[param_def.name] = values
                 else:
-                    grid_space[param_def.name] = [param_def.low, param_def.high]  # type: ignore[list-item]
+                    if param_def.low is None or param_def.high is None:
+                        raise ValueError(
+                            f"Float parameter '{param_def.name}' requires low and high for grid space"
+                        )
+                    grid_space[param_def.name] = [float(param_def.low), float(param_def.high)]
             elif param_def.param_type == 'int':
+                if param_def.low is None or param_def.high is None:
+                    raise ValueError(
+                        f"Int parameter '{param_def.name}' requires low and high for grid space"
+                    )
                 grid_space[param_def.name] = list(
-                    range(int(param_def.low), int(param_def.high))  # type: ignore[arg-type]
+                    range(int(param_def.low), int(param_def.high))
                 )
             elif param_def.param_type == 'categorical':
-                grid_space[param_def.name] = param_def.choices  # type: ignore[assignment]
+                if param_def.choices is None:
+                    raise ValueError(
+                        f"Categorical parameter '{param_def.name}' requires choices for grid space"
+                    )
+                grid_space[param_def.name] = list(param_def.choices)
             elif param_def.param_type == 'loguniform':
-                grid_space[param_def.name] = [param_def.low, param_def.high]  # type: ignore[list-item]
+                if param_def.low is None or param_def.high is None:
+                    raise ValueError(
+                        f"Loguniform parameter '{param_def.name}' requires low and high for grid space"
+                    )
+                grid_space[param_def.name] = [float(param_def.low), float(param_def.high)]
 
         return grid_space
 
@@ -470,7 +508,8 @@ class OptimizationConfig:
                 "Grid sampler requires search space - use ParameterSpace.create_grid_space()"
             )
 
-        return sampler_class(**self.sampler_kwargs)  # type: ignore[no-any-return]
+        sampler: optuna.samplers.BaseSampler = sampler_class(**self.sampler_kwargs)
+        return sampler
 
     def get_storage_url(self) -> str | None:
         """Get storage URL with defaults applied.

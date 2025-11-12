@@ -125,9 +125,10 @@ class OptunaStudyManager:
                     storage=storage_url,
                 )
             else:
-                self._study = optuna.load_study(
-                    study_name=config.study_name,
-                    storage=None,  # type: ignore[arg-type]
+                # In-memory studies cannot be re-loaded without a storage URL; raise an error.
+                raise ValueError(
+                    "Cannot load study without a storage URL. "
+                    "Configure OptimizationConfig.storage_url to use persistent storage."
                 )
 
             self.logger.info(f"Loaded existing study: {self.study_name}")
@@ -170,9 +171,9 @@ class OptunaStudyManager:
                     storage=self.storage_url,
                 )
             else:
-                optuna.delete_study(
-                    study_name=self.study_name,
-                    storage=None,  # type: ignore[arg-type]
+                raise ValueError(
+                    "Cannot delete study without a storage URL. "
+                    "Configure OptimizationConfig.storage_url for persistent studies."
                 )
 
             self.logger.info(f"Deleted study: {self.study_name}")

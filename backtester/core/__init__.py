@@ -1,7 +1,7 @@
 """Core layer for backtest engine, performance metrics, configuration, and logging."""
 
-from .backtest_engine import BacktestEngine
-from .config import (
+from backtester.core.backtest_engine import BacktestEngine
+from backtester.core.config import (
     BacktesterConfig,
     ComprehensiveRiskConfig,
     DataRetrievalConfig,
@@ -13,8 +13,8 @@ from .config import (
     reset_config,
     set_config,
 )
-from .logger import get_backtester_logger
-from .performance import PerformanceAnalyzer
+from backtester.core.logger import get_backtester_logger
+from backtester.core.performance import PerformanceAnalyzer
 
 __all__ = [
     'BacktestEngine',

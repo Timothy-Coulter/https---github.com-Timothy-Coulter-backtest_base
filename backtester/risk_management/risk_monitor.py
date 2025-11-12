@@ -11,7 +11,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from .component_configs.risk_monitoring_config import RiskMonitoringConfig
+from backtester.risk_management.component_configs.risk_monitoring_config import RiskMonitoringConfig
 
 
 class RiskMonitor:

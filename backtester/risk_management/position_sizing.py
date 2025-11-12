@@ -7,7 +7,10 @@ fixed percentage, Kelly criterion, risk-based, volatility-adjusted, and correlat
 import logging
 from typing import Any
 
-from .component_configs.position_sizing_config import PositionSizingConfig, SizingMethod
+from backtester.risk_management.component_configs.position_sizing_config import (
+    PositionSizingConfig,
+    SizingMethod,
+)
 
 
 class PositionSizer:

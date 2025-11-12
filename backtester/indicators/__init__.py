@@ -5,6 +5,8 @@ and backtesting. It follows the established modular component architecture patte
 with proper typing and integration with existing backtester components.
 """
 
+from backtester.signal.signal_types import SignalGenerator, SignalType
+
 from .atr import ATRIndicator
 from .base_indicator import BaseIndicator
 from .bollinger_bands import BollingerBandsIndicator
@@ -15,7 +17,6 @@ from .indicator_configs import IndicatorConfig
 from .macd import MACDIndicator
 from .obv import OBVIndicator
 from .rsi import RSIIndicator
-from .signal_types import SignalGenerator, SignalType
 
 # Import all indicator implementations
 from .sma import SMAIndicator

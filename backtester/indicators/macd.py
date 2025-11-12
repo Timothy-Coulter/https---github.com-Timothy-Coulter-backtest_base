@@ -8,9 +8,10 @@ from typing import Any
 
 import pandas as pd
 
+from backtester.signal.signal_types import SignalType
+
 from .base_indicator import BaseIndicator, IndicatorFactory
 from .indicator_configs import IndicatorConfig
-from .signal_types import SignalType
 
 
 @IndicatorFactory.register("macd")

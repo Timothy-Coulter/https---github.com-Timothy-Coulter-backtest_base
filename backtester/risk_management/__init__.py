@@ -5,27 +5,29 @@ stop-loss, take-profit, position sizing, risk limits, monitoring, and metrics ca
 """
 
 # Configuration classes
-from .component_configs.comprehensive_risk_config import ComprehensiveRiskConfig
-from .component_configs.position_sizing_config import PositionSizingConfig
-from .component_configs.risk_limit_config import RiskLimitConfig
-from .component_configs.risk_monitoring_config import RiskMonitoringConfig
-from .component_configs.stop_loss_config import StopLossConfig
-from .component_configs.take_profit_config import TakeProfitConfig
+from backtester.risk_management.component_configs.comprehensive_risk_config import (
+    ComprehensiveRiskConfig,
+)
+from backtester.risk_management.component_configs.position_sizing_config import PositionSizingConfig
+from backtester.risk_management.component_configs.risk_limit_config import RiskLimitConfig
+from backtester.risk_management.component_configs.risk_monitoring_config import RiskMonitoringConfig
+from backtester.risk_management.component_configs.stop_loss_config import StopLossConfig
+from backtester.risk_management.component_configs.take_profit_config import TakeProfitConfig
 
 # Core risk management classes
-from .position_sizing import PositionSizer
-from .risk_limits import RiskLimits
-from .risk_metrics_calculator import RiskMetricsCalculator
-from .risk_monitor import RiskMonitor
-from .risk_signals import (
+from backtester.risk_management.position_sizing import PositionSizer
+from backtester.risk_management.risk_limits import RiskLimits
+from backtester.risk_management.risk_metrics_calculator import RiskMetricsCalculator
+from backtester.risk_management.risk_monitor import RiskMonitor
+from backtester.risk_management.risk_signals import (
     RiskAction,
     RiskAlert,
     RiskLimit,
     RiskMetric,
     RiskSignal,
 )
-from .stop_loss import StopLoss
-from .take_profit import TakeProfit
+from backtester.risk_management.stop_loss import StopLoss
+from backtester.risk_management.take_profit import TakeProfit
 
 __all__ = [
     # Configuration classes
