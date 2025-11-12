@@ -8,6 +8,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+from joblib import dump, load  # type: ignore
 from sklearn.base import BaseEstimator
 from sklearn.cluster import KMeans
 from sklearn.ensemble import (
@@ -16,7 +17,6 @@ from sklearn.ensemble import (
     RandomForestClassifier,
     RandomForestRegressor,
 )
-from sklearn.externals import joblib
 from sklearn.linear_model import (
     ElasticNet,
     Lasso,
@@ -157,7 +157,7 @@ class SklearnAdapter(ModelFrameworkAdapter):
             model: Sklearn model instance
             filepath: Path to save the model
         """
-        joblib.dump(model, filepath)
+        dump(model, filepath)
         self.logger.info(f"Saved sklearn model to: {filepath}")
 
     def load_model(self, filepath: str) -> Any:
@@ -169,7 +169,7 @@ class SklearnAdapter(ModelFrameworkAdapter):
         Returns:
             Loaded model instance
         """
-        model = joblib.load(filepath)
+        model = load(filepath)
         self.logger.info(f"Loaded sklearn model from: {filepath}")
         return model
 

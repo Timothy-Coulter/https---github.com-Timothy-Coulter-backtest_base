@@ -357,7 +357,7 @@ class TestBaseModel:
             confidence=0.9,
             timestamp="2023-01-02",
         )
-        assert signal_enum['signal_type'] == SignalType.BUY
+        assert signal_enum['signal_type'] == 'BUY'
 
     @patch('backtester.model.base_model.BacktesterLogger')
     def test_configuration_validation(self, mock_logger: Mock, sample_config: ModelConfig) -> None:
