@@ -7,6 +7,21 @@ signal strategies, and portfolio strategies.
 # Base strategy
 from .base import BaseStrategy, Signal
 
+# Strategy orchestration
+from .orchestration import (
+    BaseStrategyOrchestrator,
+    ConditionalStrategyOrchestrator,
+    EnsembleStrategyOrchestrator,
+    MasterSlaveStrategyOrchestrator,
+    OrchestrationConfig,
+    OrchestratorType,
+    ParallelStrategyOrchestrator,
+    SequentialStrategyOrchestrator,
+    StrategyKind,
+    StrategyReference,
+    StrategyRole,
+)
+
 # Portfolio strategies
 from .portfolio.base_portfolio_strategy import BasePortfolioStrategy
 from .portfolio.equal_weight_strategy import EqualWeightStrategy
@@ -34,13 +49,6 @@ from .signal.ml_model_strategy import MLModelStrategy
 from .signal.momentum_strategy import MomentumStrategy
 from .signal.signal_strategy_config import SignalStrategyConfig
 from .signal.technical_analysis_strategy import TechnicalAnalysisStrategy
-
-# Strategy orchestration (if implemented)
-# from .orchestration.base_orchestration import BaseStrategyOrchestrator
-# from .orchestration.sequential_orchestrator import SequentialOrchestrator
-# from .orchestration.parallel_orchestrator import ParallelOrchestrator
-# from .orchestration.ensemble_orchestrator import EnsembleOrchestrator
-# from .orchestration.orchration_strategy_config import OrchestrationConfig
 
 __all__ = [
     # Base strategy
@@ -70,10 +78,16 @@ __all__ = [
     'AllocationMethod',
     'RiskParameters',
     'PerformanceMetrics',
-    # Strategy orchestration (commented out until implemented)
-    # 'BaseStrategyOrchestrator',
-    # 'SequentialOrchestrator',
-    # 'ParallelOrchestrator',
-    # 'EnsembleOrchestrator',
-    # 'OrchestrationConfig',
+    # Strategy orchestration
+    'BaseStrategyOrchestrator',
+    'SequentialStrategyOrchestrator',
+    'ParallelStrategyOrchestrator',
+    'EnsembleStrategyOrchestrator',
+    'MasterSlaveStrategyOrchestrator',
+    'ConditionalStrategyOrchestrator',
+    'OrchestrationConfig',
+    'OrchestratorType',
+    'StrategyReference',
+    'StrategyKind',
+    'StrategyRole',
 ]

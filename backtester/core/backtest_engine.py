@@ -13,6 +13,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from backtester.core.config import BacktesterConfig, get_config
+from backtester.core.event_bus import EventBus
+from backtester.core.events import create_market_data_event
 from backtester.core.logger import get_backtester_logger
 from backtester.core.performance import PerformanceAnalyzer
 from backtester.data.data_retrieval import DataRetrieval
@@ -22,6 +24,13 @@ from backtester.portfolio import GeneralPortfolio
 from backtester.risk_management.risk_control_manager import RiskControlManager
 from backtester.strategy.base import BaseStrategy
 from backtester.strategy.moving_average import DualPoolMovingAverageStrategy
+from backtester.strategy.orchestration import (
+    BaseStrategyOrchestrator,
+    OrchestrationConfig,
+    OrchestratorType,
+    StrategyKind,
+    StrategyReference,
+)
 
 warnings.filterwarnings('ignore')
 
@@ -30,16 +39,44 @@ class BacktestEngine:
     """Main backtesting engine that coordinates all components."""
 
     def __init__(
-        self, config: BacktesterConfig | None = None, logger: logging.Logger | None = None
+        self,
+        config: BacktesterConfig | None = None,
+        logger: logging.Logger | None = None,
+        event_bus: EventBus | None = None,
+        strategy_orchestrator: BaseStrategyOrchestrator | None = None,
     ) -> None:
         """Initialize the backtest engine.
 
         Args:
             config: Backtester configuration
             logger: Logger instance
+            event_bus: Optional shared event bus instance
+            strategy_orchestrator: Optional strategy orchestrator instance
         """
         self.config: BacktesterConfig = config or get_config()
         self.logger: logging.Logger = logger or get_backtester_logger(__name__)
+        self.event_bus: EventBus
+
+        if strategy_orchestrator is not None:
+            self.strategy_orchestrator: BaseStrategyOrchestrator = strategy_orchestrator
+            self.event_bus = event_bus or strategy_orchestrator.event_bus
+        else:
+            self.event_bus = event_bus or EventBus()
+            default_config = OrchestrationConfig(
+                orchestrator_type=OrchestratorType.SEQUENTIAL,
+                strategies=[
+                    StrategyReference(
+                        identifier="primary_strategy",
+                        kind=StrategyKind.SIGNAL,
+                        priority=0,
+                    )
+                ],
+            )
+            self.strategy_orchestrator = BaseStrategyOrchestrator.create(
+                config=default_config,
+                event_bus=self.event_bus,
+            )
+        self._primary_strategy_id = "primary_strategy"
 
         # Initialize components immediately (for test compatibility)
         assert self.config.data is not None
@@ -139,6 +176,15 @@ class BacktestEngine:
         for key, value in strategy_params.items():
             if hasattr(self.current_strategy, key):
                 setattr(self.current_strategy, key, value)
+
+        # Register strategy with orchestrator for event-driven coordination
+        self.strategy_orchestrator.unregister_strategy(self._primary_strategy_id)
+        self.strategy_orchestrator.register_strategy(
+            identifier=self._primary_strategy_id,
+            strategy=self.current_strategy,
+            kind=StrategyKind.SIGNAL,
+            priority=0,
+        )
 
         self.logger.info(f"Created strategy: {self.current_strategy.name}")
         return self.current_strategy
@@ -374,6 +420,9 @@ class BacktestEngine:
         alpha_values: list[float] = []
 
         self.logger.info("Running simulation loop...")
+        assert self.config.data is not None
+        tickers = self.config.data.tickers or ["SPY"]
+        simulation_symbol = tickers[0] if isinstance(tickers, list) else tickers
 
         # Initialize daily tracking (using existing method or skip if not available)
         # self.current_risk_manager.start_new_day(self.current_portfolio.initial_capital)
@@ -388,9 +437,31 @@ class BacktestEngine:
             day_high = current_row['High'].iloc[0]
             day_low = current_row['Low'].iloc[0]
 
-            assert self.current_strategy is not None
-            # Generate signals from strategy
-            signals = self.current_strategy.generate_signals(current_row)
+            # Build market data event and orchestrate strategies
+            row_series = current_row.iloc[0]
+            market_payload = {
+                "open": float(row_series.get("Open", row_series.get("open", current_price))),
+                "high": float(row_series.get("High", row_series.get("high", day_high))),
+                "low": float(row_series.get("Low", row_series.get("low", day_low))),
+                "close": float(row_series.get("Close", row_series.get("close", current_price))),
+                "volume": float(row_series.get("Volume", row_series.get("volume", 0.0))),
+                "timestamp": (
+                    current_time.timestamp() if hasattr(current_time, "timestamp") else None
+                ),
+                "data_type": "bar",
+            }
+            market_event = create_market_data_event(simulation_symbol, market_payload)
+            market_event.metadata.setdefault("data_frame", current_row.copy())
+            self.event_bus.publish(market_event)
+
+            orchestration_result = self.strategy_orchestrator.on_market_data(
+                market_event, current_row
+            )
+            signals = [signal.payload for signal in orchestration_result.signals]
+
+            # Fallback to direct strategy invocation when orchestrator produced nothing
+            if not signals and self.current_strategy is not None:
+                signals = self.current_strategy.generate_signals(current_row)
 
             # Process signals and update portfolio
             portfolio_update = self._process_signals_and_update_portfolio(
@@ -414,7 +485,8 @@ class BacktestEngine:
             alpha_values.append(portfolio_update['total_value'] / 2)
 
             # Update strategy step
-            self.current_strategy.update_step(i + 1)
+            if self.current_strategy is not None:
+                self.current_strategy.update_step(i + 1)
 
             # Log progress for large datasets
             if (i + 1) % 50 == 0:

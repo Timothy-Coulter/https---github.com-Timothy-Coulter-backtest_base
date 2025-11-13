@@ -148,7 +148,7 @@ class TechnicalAnalysisStrategy(BaseSignalStrategy):
         high_close = (data['high'] - data['close'].shift(1)).abs()
         low_close = (data['low'] - data['close'].shift(1)).abs()
         tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
-        atr = tr.rolling(window=period).mean().fillna(method='bfill')
+        atr = tr.rolling(window=period).mean().bfill()
         return atr.fillna(0.0)
 
     def _compute_adx(
@@ -230,7 +230,7 @@ class TechnicalAnalysisStrategy(BaseSignalStrategy):
         result['obv'] = pd.Series(obv, index=result.index)
         result['volume_sma'] = result['volume'].rolling(window=20).mean()
 
-        return result.fillna(method='bfill').fillna(method='ffill')
+        return result.bfill().ffill()
 
     # Signal generators ----------------------------------------------------
     def _calculate_trend_signals(
