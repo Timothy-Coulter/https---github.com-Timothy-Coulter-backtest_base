@@ -86,6 +86,25 @@ class SimulatedBroker:
 
         self.logger.info("Simulated broker initialized")
 
+    # ------------------------------------------------------------------#
+    # Lifecycle hooks
+    # ------------------------------------------------------------------#
+    def before_run(self, metadata: dict[str, Any] | None = None) -> None:
+        """Hook invoked before the simulation loop starts."""
+        return None
+
+    def before_tick(self, context: dict[str, Any]) -> None:
+        """Hook invoked before processing each tick."""
+        return None
+
+    def after_tick(self, context: dict[str, Any], results: dict[str, Any]) -> None:
+        """Hook invoked after completing each tick."""
+        return None
+
+    def after_run(self, metadata: dict[str, Any] | None = None) -> None:
+        """Hook invoked after the simulation loop finishes."""
+        return None
+
     def submit_order(
         self,
         *,

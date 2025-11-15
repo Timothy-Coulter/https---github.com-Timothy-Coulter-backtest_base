@@ -517,6 +517,25 @@ class BaseSignalStrategy(ABC):
             self.logger.error(f"Error validating data: {e}")
             return False
 
+    # ------------------------------------------------------------------#
+    # Lifecycle hooks
+    # ------------------------------------------------------------------#
+    def before_run(self, metadata: dict[str, Any] | None = None) -> None:
+        """Hook invoked before the simulation loop starts."""
+        return None
+
+    def before_tick(self, context: dict[str, Any]) -> None:
+        """Hook invoked before each processed market data tick."""
+        return None
+
+    def after_tick(self, context: dict[str, Any], results: dict[str, Any]) -> None:
+        """Hook invoked after executing a tick."""
+        return None
+
+    def after_run(self, metadata: dict[str, Any] | None = None) -> None:
+        """Hook invoked after the simulation loop completes."""
+        return None
+
     def reset(self) -> None:
         """Reset strategy state for reuse."""
         self.current_step = 0

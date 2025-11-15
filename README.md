@@ -54,6 +54,13 @@ having to reverse‑engineer publisher internals.
 When subscribing, prefer the metadata keys (`symbol`/`symbols`) rather than bespoke attributes,
 as they are populated uniformly regardless of which module produced the event.
 
+## Engine Workflow
+
+The canonical simulation loop—from market data ingestion through strategy signals,
+risk evaluation, order routing, broker fills, and portfolio/performance updates—is
+documented in detail (with a Mermaid diagram) in `docs/engine_workflow.md`.
+Reference it when implementing new components or investigating event ordering.
+
 ## Development Commands
 
 ### Code Formatting and Linting

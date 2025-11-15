@@ -88,6 +88,25 @@ class GeneralPortfolio(BasePortfolio):
             total += position.quantity * position.current_price
         return total
 
+    # ------------------------------------------------------------------#
+    # Lifecycle hooks
+    # ------------------------------------------------------------------#
+    def before_run(self, metadata: dict[str, Any] | None = None) -> None:
+        """Hook invoked before the simulation loop begins."""
+        return None
+
+    def before_tick(self, context: dict[str, Any]) -> None:
+        """Hook invoked before processing each tick."""
+        return None
+
+    def after_tick(self, context: dict[str, Any], results: dict[str, Any]) -> None:
+        """Hook invoked after finishing each tick."""
+        return None
+
+    def after_run(self, metadata: dict[str, Any] | None = None) -> None:
+        """Hook invoked after the simulation loop completes."""
+        return None
+
     def add_position(
         self,
         symbol: str,

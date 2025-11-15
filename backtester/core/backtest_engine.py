@@ -6,6 +6,7 @@ portfolio management, risk management, and performance analysis.
 """
 
 import logging
+import uuid
 import warnings
 from typing import Any
 
@@ -14,11 +15,14 @@ import pandas as pd
 
 from backtester.core.config import BacktesterConfig, BacktestRunConfig, get_config
 from backtester.core.event_bus import EventBus, EventFilter
-from backtester.core.event_handlers import PortfolioHandler, SignalHandler
+from backtester.core.event_handlers import OrderHandler, PortfolioHandler, SignalHandler
 from backtester.core.events import (
+    OrderEvent,
     PortfolioUpdateEvent,
     SignalEvent,
     create_market_data_event,
+    create_order_event,
+    create_risk_alert_event,
 )
 from backtester.core.logger import get_backtester_logger
 from backtester.core.performance import PerformanceAnalyzer
@@ -85,6 +89,24 @@ class _PortfolioCollector(PortfolioHandler):
 warnings.filterwarnings('ignore')
 
 
+class _OrderCollector(OrderHandler):
+    """Collect order events emitted during the simulation."""
+
+    def __init__(self, logger: logging.Logger) -> None:
+        super().__init__("engine_order_collector", logger)
+        self._pending: list[OrderEvent] = []
+
+    def _process_order(self, event: OrderEvent) -> None:
+        super()._process_order(event)
+        self._pending.append(event)
+
+    def drain(self) -> list[OrderEvent]:
+        """Return and clear queued order events."""
+        pending = self._pending
+        self._pending = []
+        return pending
+
+
 class BacktestEngine:
     """Main backtesting engine that coordinates all components."""
 
@@ -136,6 +158,11 @@ class BacktestEngine:
         self._portfolio_subscription_id = self.event_bus.subscribe(
             self._portfolio_collector.handle_event,
             EventFilter(event_types={'PORTFOLIO_UPDATE'}),
+        )
+        self._order_collector = _OrderCollector(self.logger)
+        self._order_subscription_id = self.event_bus.subscribe(
+            self._order_collector.handle_event,
+            EventFilter(event_types={'ORDER'}),
         )
 
         self._primary_strategy_id = "primary_strategy"
@@ -530,6 +557,11 @@ class BacktestEngine:
         if self.current_broker is not None:
             self.current_broker.reset()
         self.trade_history.clear()
+        lifecycle_metadata = {
+            'periods': len(self.current_data) - 1,
+            'symbols': self.config.data.tickers if self.config.data else None,
+        }
+        self._fire_before_run_hooks(lifecycle_metadata)
 
         # Run simulation
         self._run_simulation()
@@ -578,58 +610,63 @@ class BacktestEngine:
             }
 
         self.backtest_results = final_results
+        self._fire_after_run_hooks({'results': final_results})
         self.logger.info("Backtest completed successfully")
 
         return final_results
 
-    def _run_simulation(self) -> dict[str, Any]:
-        """Run the main simulation loop.
-
-        Returns:
-            Simulation results
-        """
+    def _run_simulation(self) -> dict[str, Any]:  # noqa: C901
+        """Run the event-driven simulation loop."""
         assert self.current_risk_manager is not None
         assert self.current_portfolio is not None
+        assert self.current_broker is not None
+        assert self.config.data is not None
+        assert self.current_data is not None
+
         portfolio_values: list[float] = []
         base_values: list[float] = []
         alpha_values: list[float] = []
 
-        self.logger.info("Running simulation loop...")
-        assert self.config.data is not None
         tickers = self.config.data.tickers or ["SPY"]
         simulation_symbol = tickers[0] if isinstance(tickers, list) else tickers
+        periods = max(len(self.current_data) - 1, 0)
+        self.logger.info("Running simulation loop (%s periods)...", periods)
 
-        # Initialize daily tracking (using existing method or skip if not available)
-        # self.current_risk_manager.start_new_day(self.current_portfolio.initial_capital)
-
-        assert self.current_data is not None
-        for i in range(len(self.current_data) - 1):
-            # Clear any signals lingering from previous iteration
+        for i in range(periods):
+            # Clear signal/order buffers from previous tick
             self._signal_collector.drain()
+            self._order_collector.drain()
 
             current_time = self.current_data.index[i]
-            current_row = self.current_data.iloc[i : i + 1]  # Single row DataFrame
+            current_row = self.current_data.iloc[i : i + 1]
             current_row_extended = current_row.copy()
             for column in list(current_row.columns):
                 lower_column = column.lower()
                 if lower_column not in current_row_extended.columns:
                     current_row_extended[lower_column] = current_row_extended[column]
 
-            # Get current market data
-            current_price = current_row['Close'].iloc[0]
-            day_high = current_row['High'].iloc[0]
-            day_low = current_row['Low'].iloc[0]
-
-            # Build market data event and orchestrate strategies
             row_series = current_row.iloc[0]
+            current_price = float(row_series.get("Close", row_series.get("close", 0.0)))
+            day_high = float(row_series.get("High", row_series.get("high", current_price)))
+            day_low = float(row_series.get("Low", row_series.get("low", current_price)))
+            volume = float(row_series.get("Volume", row_series.get("volume", 0.0)))
+
+            tick_context = {
+                'index': i,
+                'timestamp': current_time,
+                'symbol': simulation_symbol,
+                'price': current_price,
+            }
+            self._fire_tick_hook('before', tick_context)
+
             market_payload = {
                 "open": float(row_series.get("Open", row_series.get("open", current_price))),
-                "high": float(row_series.get("High", row_series.get("high", day_high))),
-                "low": float(row_series.get("Low", row_series.get("low", day_low))),
-                "close": float(row_series.get("Close", row_series.get("close", current_price))),
-                "volume": float(row_series.get("Volume", row_series.get("volume", 0.0))),
+                "high": day_high,
+                "low": day_low,
+                "close": current_price,
+                "volume": volume,
                 "timestamp": (
-                    current_time.timestamp() if hasattr(current_time, "timestamp") else None
+                    float(current_time.timestamp()) if hasattr(current_time, "timestamp") else None
                 ),
                 "data_type": "bar",
             }
@@ -644,14 +681,23 @@ class BacktestEngine:
             if not signals:
                 signals = [signal.payload for signal in orchestration_result.signals]
 
-            # Fallback to direct strategy invocation when orchestrator produced nothing
             if not signals and self.current_strategy is not None:
-                signals = self.current_strategy.generate_signals(
-                    current_row_extended, simulation_symbol
-                )
+                try:
+                    signals = self.current_strategy.generate_signals(
+                        current_row_extended, simulation_symbol
+                    )
+                except Exception as exc:
+                    self.logger.warning("Fallback signal generation failed: %s", exc)
 
-            # Process signals and update portfolio
             historical_window = self.current_data.iloc[: i + 1]
+            pre_trade_value = self.current_portfolio.total_value
+            pre_trade_risk = self._evaluate_portfolio_risk(
+                pre_trade_value,
+                stage="pre-trade",
+                timestamp=current_time,
+            )
+            allow_execution = pre_trade_risk.get('risk_level') not in {'HIGH', 'CRITICAL'}
+
             portfolio_update = self._process_signals_and_update_portfolio(
                 signals,
                 current_price,
@@ -660,44 +706,49 @@ class BacktestEngine:
                 current_time,
                 simulation_symbol,
                 historical_window,
+                allow_execution=allow_execution,
             )
+            executed_orders = portfolio_update.get('executed_orders', [])
 
-            # Check risk management
             portfolio_events = self._drain_portfolio_events()
-            latest_total_value = portfolio_update['total_value']
+            latest_total_value = portfolio_update.get('total_value', pre_trade_value)
             if portfolio_events:
                 latest_total_value = portfolio_events[-1].total_value
 
-            self._check_risk_management(latest_total_value)
-
-            # Update daily P&L tracking
-            # Store results
-            portfolio_values.append(latest_total_value)
-            assert self.current_portfolio is not None
-            base_values.append(
-                getattr(
-                    self.current_portfolio,
-                    'base_pool',
-                    type('obj', (object,), {'capital': latest_total_value / 2}),
-                )().capital
+            post_trade_risk = self._evaluate_portfolio_risk(
+                latest_total_value,
+                stage="post-trade",
+                timestamp=current_time,
             )
-            alpha_values.append(latest_total_value / 2)
 
-            # Update strategy step
+            self._record_trade_transitions(
+                executed_orders,
+                tick_index=i,
+                timestamp=current_time,
+                portfolio_value=latest_total_value,
+                risk_snapshot=post_trade_risk,
+            )
+
+            portfolio_values.append(latest_total_value)
+            base_values.append(self._extract_pool_capital('base_pool', latest_total_value / 2))
+            alpha_values.append(self._extract_pool_capital('alpha_pool', latest_total_value / 2))
+
             if self.current_strategy is not None:
                 update_step = getattr(self.current_strategy, "update_step", None)
                 if callable(update_step):
                     update_step(i + 1)
 
-            # Log progress for large datasets
-            if (i + 1) % 50 == 0:
-                self.logger.info(f"Processed {i + 1}/{len(self.current_data) - 1} periods")
+            tick_results = {
+                'portfolio_value': latest_total_value,
+                'executed_orders': len(executed_orders),
+                'risk_level': post_trade_risk.get('risk_level'),
+            }
+            self._fire_tick_hook('after', tick_context, tick_results)
 
-        # Store final values
-        assert self.current_portfolio is not None
+            if (i + 1) % 50 == 0 or i == periods - 1:
+                self.logger.debug("Processed %s/%s periods", i + 1, periods)
+
         self.current_portfolio.portfolio_values = portfolio_values
-        # For GeneralPortfolio, just store the portfolio values as both base and alpha for compatibility
-
         return {
             'portfolio_values': portfolio_values,
             'base_values': base_values,
@@ -727,6 +778,10 @@ class BacktestEngine:
         """Return portfolio update events captured during the last cycle."""
         return self._portfolio_collector.drain()
 
+    def _drain_order_events(self) -> list[OrderEvent]:
+        """Return order events captured during the last cycle."""
+        return self._order_collector.drain()
+
     def _process_signals_and_update_portfolio(
         self,
         signals: list[dict[str, Any]],
@@ -736,65 +791,144 @@ class BacktestEngine:
         timestamp: Any,
         symbol: str,
         historical_data: pd.DataFrame,
+        *,
+        allow_execution: bool = True,
     ) -> dict[str, Any]:
-        """Process strategy signals and update portfolio.
-
-        Args:
-            signals: List of signals from strategy
-            current_price: Current market price
-            day_high: High price for the day
-            day_low: Low price for the day
-            timestamp: Current timestamp
-            symbol: Trading symbol being processed
-            historical_data: Historical data up to the current timestamp
-
-        Returns:
-            Portfolio update information
-        """
-        # Process portfolio tick with current market data
-        assert self.current_portfolio is not None
-        portfolio_update = self.current_portfolio.process_tick(
-            timestamp=timestamp, current_price=current_price, day_high=day_high, day_low=day_low
-        )
-
+        """Process strategy signals, execute resulting orders, and update the portfolio."""
+        market_data = self._prepare_portfolio_market_data(symbol, historical_data)
         orders: list[dict[str, Any]] = []
-        if self.portfolio_strategy is not None:
-            market_data = self._prepare_portfolio_market_data(symbol, historical_data)
-            if market_data:
-                try:
-                    self.portfolio_strategy.update_portfolio_state(market_data)
-                    target_weights = self.portfolio_strategy.calculate_target_weights(market_data)
-                    self.portfolio_strategy.target_weights = target_weights
-
-                    enriched_signals: list[dict[str, Any]] = []
-                    for signal in signals:
-                        enriched_signal = dict(signal)
-                        enriched_signal.setdefault('symbol', symbol)
-                        enriched_signal.setdefault(
-                            'type', enriched_signal.get('signal_type', 'HOLD')
-                        )
-                        enriched_signal.setdefault('timestamp', timestamp)
-                        enriched_signals.append(enriched_signal)
-
-                    orders = self.portfolio_strategy.process_signals(enriched_signals)
-                except Exception as exc:
-                    self.logger.warning("Kelly portfolio strategy processing failed: %s", exc)
+        if self.portfolio_strategy is not None and market_data:
+            try:
+                self.portfolio_strategy.update_portfolio_state(market_data)
+                target_weights = self.portfolio_strategy.calculate_target_weights(market_data)
+                self.portfolio_strategy.target_weights = target_weights
+                enriched_signals: list[dict[str, Any]] = []
+                for signal in signals:
+                    enriched_signal = dict(signal)
+                    enriched_signal.setdefault('symbol', symbol)
+                    enriched_signal.setdefault('type', enriched_signal.get('signal_type', 'HOLD'))
+                    enriched_signal.setdefault('timestamp', timestamp)
+                    enriched_signals.append(enriched_signal)
+                orders = self.portfolio_strategy.process_signals(enriched_signals)
+            except Exception as exc:
+                self.logger.warning("Kelly portfolio strategy processing failed: %s", exc)
 
         if not orders:
             orders = self._fallback_orders_from_signals(signals, symbol, timestamp)
 
-        for order in orders:
-            enriched_order = dict(order)
-            enriched_order.setdefault('symbol', symbol)
-            enriched_order.setdefault('price', current_price)
-            enriched_order.setdefault('timestamp', timestamp)
-            metadata = dict(enriched_order.get('metadata', {}))
-            metadata.setdefault('origin', 'signal_processing')
-            metadata.setdefault('source_signal', order)
-            enriched_order['metadata'] = metadata
-            self._process_signal(enriched_order, symbol, current_price, timestamp)
+        executed_orders: list[dict[str, Any]] = []
+        if allow_execution and orders:
+            executed_orders = self._execute_orders(
+                orders,
+                symbol=symbol,
+                fallback_price=current_price,
+                timestamp=timestamp,
+            )
+        elif orders:
+            self.logger.info(
+                "Skipping execution of %s orders at %s because risk constraints were triggered",
+                len(orders),
+                timestamp,
+            )
 
+        assert self.current_portfolio is not None
+        portfolio_update = self.current_portfolio.process_tick(
+            timestamp=timestamp,
+            market_data=market_data if market_data else None,
+            current_price=current_price,
+            day_high=day_high,
+            day_low=day_low,
+        )
+        portfolio_update['executed_orders'] = executed_orders
         return portfolio_update
+
+    def _execute_orders(
+        self,
+        orders: list[dict[str, Any]],
+        *,
+        symbol: str,
+        fallback_price: float,
+        timestamp: Any,
+    ) -> list[dict[str, Any]]:
+        """Submit and record orders derived from the latest signals."""
+        assert self.current_broker is not None
+        assert self.current_portfolio is not None
+
+        executed_orders: list[dict[str, Any]] = []
+        for raw_order in orders:
+            payload = dict(raw_order)
+            order_symbol = payload.get('symbol', symbol)
+            side_raw = str(payload.get('side', payload.get('signal_type', 'HOLD'))).upper()
+            if side_raw not in {'BUY', 'SELL'}:
+                continue
+
+            quantity_value = payload.get('quantity', payload.get('size', 1.0))
+            try:
+                quantity = float(quantity_value)
+            except (TypeError, ValueError):
+                quantity = 1.0
+            if quantity <= 0:
+                continue
+
+            price_value = payload.get('price', fallback_price)
+            try:
+                price = float(price_value) if price_value is not None else fallback_price
+            except (TypeError, ValueError):
+                price = fallback_price
+
+            metadata = dict(payload.get('metadata', {}))
+            metadata.setdefault('origin', 'signal_processing')
+            metadata.setdefault('source_signal', raw_order)
+            metadata.setdefault('timestamp', timestamp)
+            metadata.setdefault('symbol', order_symbol)
+
+            order_event = create_order_event(
+                order_symbol,
+                side=side_raw,
+                order_type=payload.get('order_type', OrderType.MARKET.value),
+                quantity=quantity,
+                source="backtest_engine",
+                metadata=metadata,
+            )
+            self.event_bus.publish(order_event, immediate=True)
+
+            order = self.current_broker.submit_order(
+                symbol=order_symbol,
+                side=side_raw,
+                quantity=quantity,
+                order_type=payload.get('order_type', OrderType.MARKET.value),
+                price=price,
+                metadata=metadata,
+            )
+            if (
+                order is None
+                or order.status != OrderStatus.FILLED
+                or order.filled_price is None
+                or order.filled_quantity <= 0
+            ):
+                continue
+
+            self.current_portfolio.apply_fill(
+                symbol=order_symbol,
+                side=side_raw,
+                quantity=order.filled_quantity,
+                price=order.filled_price,
+                timestamp=timestamp,
+                metadata=metadata,
+            )
+
+            executed_orders.append(
+                {
+                    'order_id': order.order_id,
+                    'symbol': order_symbol,
+                    'side': side_raw,
+                    'filled_quantity': order.filled_quantity,
+                    'filled_price': order.filled_price,
+                    'metadata': metadata,
+                }
+            )
+
+        return executed_orders
 
     def _fallback_orders_from_signals(
         self, signals: list[dict[str, Any]], symbol: str, timestamp: Any
@@ -837,105 +971,139 @@ class BacktestEngine:
         normalized.columns = [col.lower() for col in normalized.columns]
         return {symbol: normalized}
 
-    def _process_signal(
-        self, signal: dict[str, Any], symbol: str, current_price: float, timestamp: Any
+    def _extract_pool_capital(self, attribute: str, fallback: float) -> float:
+        """Extract pool capital from the portfolio if available."""
+        assert self.current_portfolio is not None
+        pool = getattr(self.current_portfolio, attribute, None)
+        capital = getattr(pool, 'capital', None) if pool is not None else None
+        if capital is None:
+            return fallback
+        try:
+            return float(capital)
+        except (TypeError, ValueError):
+            return fallback
+
+    def _record_trade_transitions(
+        self,
+        executions: list[dict[str, Any]],
+        *,
+        tick_index: int,
+        timestamp: Any,
+        portfolio_value: float,
+        risk_snapshot: dict[str, Any] | None = None,
     ) -> None:
-        """Process individual trading signal.
+        """Capture executed trades and associated metadata for later inspection."""
+        for execution in executions:
+            record = {
+                'event': 'TRADE',
+                'tick': tick_index,
+                'timestamp': timestamp,
+                'symbol': execution['symbol'],
+                'side': execution['side'],
+                'quantity': execution['filled_quantity'],
+                'price': execution['filled_price'],
+                'portfolio_value': portfolio_value,
+                'metadata': execution.get('metadata', {}),
+            }
+            if risk_snapshot is not None:
+                record['risk_level'] = risk_snapshot.get('risk_level')
+            self.trade_history.append(record)
 
-        Args:
-            signal: Signal dictionary
-            symbol: Trading symbol
-            current_price: Current market price
-            timestamp: Current timestamp
-        """
-        side_raw = signal.get('side', signal.get('signal_type', '')).upper()
-        if side_raw not in {'BUY', 'SELL'}:
+    def _invoke_component_hook(self, component: Any | None, hook: str, *args: Any) -> None:
+        """Attempt to call a lifecycle hook on the supplied component."""
+        if component is None:
             return
-
-        quantity_value = signal.get('quantity', signal.get('size', 1.0))
-        try:
-            quantity = float(quantity_value)
-        except (TypeError, ValueError):
-            quantity = 1.0
-
-        if quantity <= 0:
+        callback = getattr(component, hook, None)
+        if not callable(callback):
             return
-
-        price_value = signal.get('price', current_price)
         try:
-            price = float(price_value) if price_value is not None else None
-        except (TypeError, ValueError):
-            price = None
+            callback(*args)
+        except Exception as exc:  # pragma: no cover - defensive logging
+            self.logger.debug("Component hook %s failed: %s", hook, exc)
 
-        metadata = dict(signal)
-        metadata.setdefault('timestamp', timestamp)
-        metadata.setdefault('symbol', symbol)
+    def _fire_before_run_hooks(self, metadata: dict[str, Any]) -> None:
+        """Notify components before the simulation loop starts."""
+        for component in (self.current_strategy, self.current_portfolio, self.current_broker):
+            self._invoke_component_hook(component, "before_run", metadata)
 
+    def _fire_after_run_hooks(self, metadata: dict[str, Any]) -> None:
+        """Notify components after the simulation loop finishes."""
+        for component in (self.current_strategy, self.current_portfolio, self.current_broker):
+            self._invoke_component_hook(component, "after_run", metadata)
+
+    def _fire_tick_hook(
+        self,
+        stage: str,
+        context: dict[str, Any],
+        results: dict[str, Any] | None = None,
+    ) -> None:
+        """Notify components before/after each tick."""
+        hook_name = "before_tick" if stage == 'before' else "after_tick"
+        for component in (self.current_strategy, self.current_portfolio, self.current_broker):
+            if stage == 'before':
+                self._invoke_component_hook(component, hook_name, context)
+            else:
+                self._invoke_component_hook(component, hook_name, context, results or {})
+
+    def _evaluate_portfolio_risk(
+        self,
+        portfolio_value: float,
+        *,
+        stage: str,
+        timestamp: Any,
+    ) -> dict[str, Any]:
+        """Evaluate portfolio-level risk and emit alerts when thresholds are triggered."""
         assert self.current_broker is not None
-        order = self.current_broker.submit_order(
-            symbol=symbol,
-            side=side_raw,
-            quantity=quantity,
-            order_type=OrderType.MARKET.value,
-            price=price,
-            metadata=metadata,
-        )
+        assert self.current_risk_manager is not None
 
-        if (
-            order is not None
-            and order.status == OrderStatus.FILLED
-            and self.current_portfolio is not None
-            and order.filled_price is not None
-        ):
-            self.current_portfolio.apply_fill(
-                symbol=symbol,
-                side=side_raw,
-                quantity=order.filled_quantity,
-                price=order.filled_price,
-                timestamp=timestamp,
-                metadata=metadata,
-            )
-
-    def _check_risk_management(self, portfolio_value: float) -> None:
-        """Check and apply risk management rules.
-
-        Args:
-            portfolio_value: Current portfolio value
-        """
-        # Get current positions from broker
-        assert self.current_broker is not None
         positions_dict: dict[str, dict[str, Any]] = {}
-        for symbol, position in self.current_broker.positions.items():
+        for symbol, quantity in self.current_broker.positions.items():
             current_price = self.current_broker.get_current_price(symbol)
-            market_value = abs(position) * current_price
+            market_value = abs(quantity) * current_price
             positions_dict[symbol] = {
-                'active': True,
+                'active': bool(quantity),
                 'market_value': market_value,
                 'symbol': symbol,
             }
 
-        # Check portfolio-level risk
-        assert self.current_risk_manager is not None
         risk_signal = self.current_risk_manager.check_portfolio_risk(
             portfolio_value, positions_dict
         )
+        risk_signal['stage'] = stage
+        risk_signal['timestamp'] = timestamp
+        self.current_risk_manager.add_risk_signal(risk_signal)
 
-        if risk_signal.get('risk_level') == 'HIGH':
-            # Cancel existing orders or close positions
-            self.current_broker.order_manager.cancel_all_orders(
-                f"Risk management: {', '.join(risk_signal.get('violations', []))}"
+        if risk_signal.get('risk_level') in {'HIGH', 'CRITICAL'}:
+            violations = risk_signal.get('violations', [])
+            message = f"Risk management ({stage}): {', '.join(violations) or 'Threshold exceeded'}"
+            self.current_broker.order_manager.cancel_all_orders(message)
+
+            alert = create_risk_alert_event(
+                alert_id=f"risk_{uuid.uuid4().hex}",
+                risk_level=risk_signal['risk_level'],
+                message=message,
+                component="BacktestEngine",
             )
-            # Convert to dict format expected by add_risk_signal
-            signal_dict = {
-                'action': 'REDUCE_POSITION',
-                'reason': f"Portfolio risk violations: {', '.join(risk_signal.get('violations', []))}",
-                'confidence': 0.7,  # High confidence for risk violations
-                'metadata': {
-                    'source': 'portfolio_risk_check',
-                    'violations': risk_signal.get('violations', []),
-                },
-            }
-            self.current_risk_manager.add_risk_signal(signal_dict)
+            alert.metadata.update(
+                {
+                    'stage': stage,
+                    'portfolio_value': portfolio_value,
+                    'violations': violations,
+                }
+            )
+            self.event_bus.publish(alert, immediate=True)
+            self.trade_history.append(
+                {
+                    'event': 'RISK_ALERT',
+                    'tick_stage': stage,
+                    'timestamp': timestamp,
+                    'portfolio_value': portfolio_value,
+                    'violations': violations,
+                    'risk_level': risk_signal.get('risk_level'),
+                }
+            )
+
+        return risk_signal
 
     def _calculate_performance_metrics(self) -> dict[str, Any]:
         """Calculate comprehensive performance metrics.
