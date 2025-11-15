@@ -51,6 +51,12 @@ from backtester.core.events import (
     create_signal_event,
     create_strategy_event,
 )
+from backtester.core.interfaces import (
+    BrokerProtocol,
+    PortfolioProtocol,
+    RiskManagerProtocol,
+    StrategyProtocol,
+)
 from backtester.core.logger import get_backtester_logger
 from backtester.core.performance import PerformanceAnalyzer
 
@@ -72,6 +78,10 @@ __all__ = [
     'reset_config',
     'get_backtester_logger',
     'PerformanceAnalyzer',
+    'StrategyProtocol',
+    'PortfolioProtocol',
+    'BrokerProtocol',
+    'RiskManagerProtocol',
     # Event system
     'EventBus',
     'Event',

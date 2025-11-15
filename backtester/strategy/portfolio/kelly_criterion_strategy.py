@@ -203,7 +203,7 @@ class KellyCriterionStrategy(BasePortfolioStrategy):
             self.logger.error(f"Error calculating Kelly fraction: {e}")
             return 0.0
 
-    def process_signals(self, signals: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def process_signals(self, signals: list[dict[str, Any]]) -> list[dict[str, Any]]:  # noqa: C901
         """Process trading signals and generate portfolio actions.
 
         Args:
@@ -288,6 +288,11 @@ class KellyCriterionStrategy(BasePortfolioStrategy):
                     account_value=total_value, entry_price=current_price, symbol=symbol, side=side
                 )
 
+            if not self._enforce_risk_controls(
+                symbol, side, quantity, current_price, total_value, signal_type
+            ):
+                continue
+
             # Create order
             order = {
                 'symbol': symbol,
@@ -338,6 +343,28 @@ class KellyCriterionStrategy(BasePortfolioStrategy):
 
         except Exception as e:
             self.logger.error(f"Error recording trade for Kelly calculation: {e}")
+
+    def _enforce_risk_controls(
+        self,
+        symbol: str,
+        side: str,
+        quantity: float,
+        price: float,
+        portfolio_value: float,
+        signal_type: str,
+    ) -> bool:
+        """Apply shared risk checks for each prospective order."""
+        if not self.risk_manager:
+            return True
+
+        metadata = {'strategy': self.name, 'signal': signal_type}
+        if side == 'BUY' and not self.risk_manager.can_open_position(
+            symbol, quantity * price, portfolio_value, metadata
+        ):
+            return False
+
+        self.risk_manager.record_order(symbol, side, quantity, price, metadata)
+        return True
 
     def _apply_constraints(self, weights: dict[str, float]) -> dict[str, float]:
         """Apply portfolio constraints to weights.

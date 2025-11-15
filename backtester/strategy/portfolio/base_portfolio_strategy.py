@@ -12,6 +12,7 @@ from typing import Any
 import pandas as pd
 
 from backtester.core.event_bus import EventBus
+from backtester.core.interfaces import RiskManagerProtocol
 from backtester.portfolio.base_portfolio import BasePortfolio
 from backtester.risk_management.position_sizing import PositionSizer
 
@@ -56,6 +57,7 @@ class BasePortfolioStrategy(ABC):
         # Risk management integration
         self.position_sizing: PositionSizer | None = None
         self.risk_limits: dict[str, Any] | None = None
+        self.risk_manager: RiskManagerProtocol | None = None
 
         # Performance tracking
         self.performance_metrics: dict[str, Any] = {}
@@ -106,6 +108,12 @@ class BasePortfolioStrategy(ABC):
         """
         self.risk_limits = risk_limits
         self.logger.info(f"Set risk limits for strategy {self.name}")
+
+    def set_risk_manager(self, risk_manager: RiskManagerProtocol | None) -> None:
+        """Connect a risk manager so strategies can delegate risk checks."""
+        self.risk_manager = risk_manager
+        if risk_manager is not None:
+            self.logger.info("Risk manager attached to strategy %s", self.name)
 
     def update_portfolio_state(self, market_data: dict[str, pd.DataFrame]) -> None:
         """Update portfolio state based on market data.

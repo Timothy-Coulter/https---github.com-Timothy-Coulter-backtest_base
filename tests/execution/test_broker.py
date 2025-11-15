@@ -6,7 +6,7 @@ commission calculation, position management, and configuration usage.
 """
 
 import logging
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pandas as pd
 import pytest
@@ -448,6 +448,19 @@ class TestOrderExecution:
 
         assert broker.positions["TEST"] == 50.0
         assert broker.cash_balance > 10000.0  # Cash should increase
+
+    def test_submit_order_with_risk_manager(self, market_data: pd.DataFrame) -> None:
+        """submit_order should call risk manager hooks when provided."""
+        risk_manager = Mock()
+        risk_manager.can_open_position.return_value = True
+        broker = SimulatedBroker(risk_manager=risk_manager, initial_cash=10000.0)
+        broker.set_market_data("TEST", market_data)
+
+        order = broker.submit_order(symbol="TEST", side="BUY", quantity=10.0)
+        assert order is not None
+        assert order.status == OrderStatus.FILLED
+        risk_manager.record_order.assert_called_once()
+        risk_manager.record_fill.assert_called_once()
 
 
 class TestSlippageModels:

@@ -233,3 +233,48 @@ class TestGeneralPortfolio:
         assert 'max_positions' in summary
         assert summary['current_positions'] == 1
         assert summary['max_positions'] == 10
+
+    def test_apply_fill_updates_positions(self) -> None:
+        """Executed fills should create/update and close positions."""
+        portfolio = GeneralPortfolio(initial_capital=1000.0)
+        timestamp = datetime(2023, 1, 1)
+
+        # Buy creates a new position
+        portfolio.apply_fill(
+            symbol='AAPL',
+            side='BUY',
+            quantity=5,
+            price=100.0,
+            timestamp=timestamp,
+        )
+        assert 'AAPL' in portfolio.positions
+        assert portfolio.positions['AAPL'].quantity == 5
+
+        # Additional buy updates the existing position
+        portfolio.apply_fill(
+            symbol='AAPL',
+            side='BUY',
+            quantity=5,
+            price=110.0,
+            timestamp=timestamp,
+        )
+        assert portfolio.positions['AAPL'].quantity == 10
+
+        # Sells reduce and eventually remove the position
+        portfolio.apply_fill(
+            symbol='AAPL',
+            side='SELL',
+            quantity=5,
+            price=120.0,
+            timestamp=timestamp,
+        )
+        assert portfolio.positions['AAPL'].quantity == 5
+
+        portfolio.apply_fill(
+            symbol='AAPL',
+            side='SELL',
+            quantity=5,
+            price=125.0,
+            timestamp=timestamp,
+        )
+        assert 'AAPL' not in portfolio.positions

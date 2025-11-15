@@ -56,6 +56,8 @@ class RiskControlManager:
         # State tracking
         self.current_positions: dict[str, Any] = {}
         self.risk_signals_history: list[dict[str, Any]] = []
+        self.order_history: list[dict[str, Any]] = []
+        self.current_leverage: float = 0.0
 
         if self.event_bus is not None:
             self._subscribe_to_portfolio_updates()
@@ -271,6 +273,116 @@ class RiskControlManager:
 
         return position_size, risk_amount
 
+    # --- New helper methods used by other components ---------------------------------
+    def can_open_position(
+        self,
+        symbol: str,
+        notional: float,
+        portfolio_value: float | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> bool:
+        """Evaluate whether a requested exposure fits within configured limits."""
+        if notional <= 0:
+            return True
+
+        if portfolio_value is None or portfolio_value <= 0:
+            # Without context we cannot apply allocation checks, so allow the trade.
+            return True
+
+        max_allocation = portfolio_value * self.config.max_position_size
+        existing_value = self.current_positions.get(symbol, {}).get('market_value', 0.0)
+        projected = existing_value + notional
+
+        if projected <= max_allocation:
+            return True
+
+        breaching_ratio = projected / portfolio_value if portfolio_value else 0.0
+        reason = (
+            f"Opening {symbol} for ${notional:,.2f} breaches max position "
+            f"{self.config.max_position_size:.0%} allocation (projected {breaching_ratio:.0%})"
+        )
+        self.add_risk_signal(
+            {
+                'action': 'REJECT_ORDER',
+                'reason': reason,
+                'symbol': symbol,
+                'metadata': metadata or {},
+            }
+        )
+        self.logger.warning(reason)
+        return False
+
+    def record_order(
+        self,
+        symbol: str,
+        side: str,
+        quantity: float,
+        price: float,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        """Track the lifecycle of submitted orders for diagnostics/auditing."""
+        self.order_history.append(
+            {
+                'timestamp': pd.Timestamp.now(),
+                'symbol': symbol,
+                'side': side,
+                'quantity': quantity,
+                'price': price,
+                'metadata': metadata or {},
+            }
+        )
+
+    def record_fill(
+        self,
+        symbol: str,
+        side: str,
+        quantity: float,
+        price: float,
+        portfolio_value: float | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        """Update tracked exposures after an order fill completes."""
+        notional = abs(quantity * price)
+        if notional == 0:
+            return
+
+        position = self.current_positions.setdefault(
+            symbol,
+            {
+                'symbol': symbol,
+                'quantity': 0.0,
+                'market_value': 0.0,
+                'active': True,
+            },
+        )
+
+        if side.upper() == 'BUY':
+            position['quantity'] += quantity
+            position['market_value'] += notional
+        else:
+            position['quantity'] -= quantity
+            position['market_value'] = max(position['market_value'] - notional, 0.0)
+
+        if abs(position['quantity']) <= 1e-9 or position['market_value'] <= 1e-6:
+            position['active'] = False
+            self.current_positions.pop(symbol, None)
+        else:
+            position['active'] = True
+
+        if portfolio_value and portfolio_value > 0:
+            total_exposure = sum(
+                abs(pos.get('market_value', 0.0)) for pos in self.current_positions.values()
+            )
+            self.current_leverage = total_exposure / portfolio_value
+
+        self.logger.debug(
+            "Recorded fill for %s: side=%s qty=%.2f price=%.4f",
+            symbol,
+            side,
+            quantity,
+            price,
+        )
+
     def check_portfolio_risk(
         self, portfolio_value: float, positions: dict[str, dict[str, Any]]
     ) -> dict[str, Any]:
@@ -304,10 +416,10 @@ class RiskControlManager:
                 result['risk_level'] = 'HIGH'
 
         # Check leverage - handle both cases where leverage is tracked and not tracked
-        if hasattr(self, 'current_leverage'):
-            # Use tracked leverage
-            if self.current_leverage > self.config.max_leverage:
-                result['violations'].append(f"Max leverage exceeded: {self.current_leverage:.2f}x")
+        current_leverage = getattr(self, 'current_leverage', None)
+        if current_leverage:
+            if current_leverage > self.config.max_leverage:
+                result['violations'].append(f"Max leverage exceeded: {current_leverage:.2f}x")
                 result['risk_level'] = 'HIGH'
         elif positions:
             # If we have positions but no tracked leverage, calculate from positions

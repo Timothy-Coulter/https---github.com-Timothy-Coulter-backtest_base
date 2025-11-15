@@ -421,6 +421,33 @@ class TestRiskControlManager:
         assert abs(position_size - expected_position_size) < 0.01
         assert risk_amount == 0.0
 
+    def test_can_open_position_respects_limits(
+        self, default_config: ComprehensiveRiskConfig
+    ) -> None:
+        """Risk manager should block trades that exceed max position size."""
+        manager = RiskControlManager(config=default_config)
+        assert manager.can_open_position("AAPL", 500.0, 10000.0) is True
+
+        # Default max position size is 10% so $2,000 on $10k should be rejected.
+        assert manager.can_open_position("AAPL", 2000.0, 10000.0) is False
+        assert manager.risk_signals_history, "Risk signal should be recorded on violation"
+
+    def test_record_order_and_fill_updates_state(
+        self, default_config: ComprehensiveRiskConfig
+    ) -> None:
+        """record_order and record_fill should keep internal tracking in sync."""
+        manager = RiskControlManager(config=default_config)
+
+        manager.record_order("AAPL", "BUY", 10.0, 100.0, {'source': 'test'})
+        assert len(manager.order_history) == 1
+
+        manager.record_fill("AAPL", "BUY", 10.0, 100.0, portfolio_value=10000.0)
+        assert "AAPL" in manager.current_positions
+        assert manager.current_leverage > 0
+
+        manager.record_fill("AAPL", "SELL", 10.0, 110.0, portfolio_value=10000.0)
+        assert "AAPL" not in manager.current_positions
+
     def test_check_portfolio_risk_empty_positions(
         self, default_config: ComprehensiveRiskConfig
     ) -> None:

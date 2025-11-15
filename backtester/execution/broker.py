@@ -17,7 +17,8 @@ from backtester.core.events import OrderEvent as BusOrderEvent
 from backtester.core.events import OrderSide as EventOrderSide
 from backtester.core.events import OrderStatus as EventOrderStatus
 from backtester.core.events import OrderType as EventOrderType
-from backtester.execution.order import Order, OrderManager, OrderType
+from backtester.core.interfaces import RiskManagerProtocol
+from backtester.execution.order import Order, OrderManager, OrderSide, OrderType
 
 
 class SimulatedBroker:
@@ -34,6 +35,8 @@ class SimulatedBroker:
         latency_ms: float | None = None,
         logger: logging.Logger | None = None,
         event_bus: EventBus | None = None,
+        risk_manager: RiskManagerProtocol | None = None,
+        initial_cash: float | None = None,
     ) -> None:
         """Initialize the simulated broker.
 
@@ -47,9 +50,12 @@ class SimulatedBroker:
             latency_ms: Simulated latency in milliseconds - deprecated, use config
             logger: Optional logger instance
             event_bus: Optional event bus for publishing order execution events
+            risk_manager: Optional risk manager used for additional risk checks
+            initial_cash: Initial cash balance assigned to the broker
         """
         self.logger: logging.Logger = logger or logging.getLogger(__name__)
         self.event_bus = event_bus
+        self.risk_manager = risk_manager
 
         # Use config if provided, otherwise use individual parameters
         if config is not None:
@@ -74,11 +80,48 @@ class SimulatedBroker:
         self.market_data: dict[str, pd.DataFrame] = {}
         self.current_prices: dict[str, float] = {}
         self.trade_history: list[dict[str, Any]] = []
-        self.cash_balance: float = 0.0
+        self.cash_balance: float = initial_cash or 0.0
         self.positions: dict[str, float] = {}
-        self.portfolio_value: float = 0.0
+        self.portfolio_value: float = self.cash_balance
 
         self.logger.info("Simulated broker initialized")
+
+    def submit_order(
+        self,
+        *,
+        symbol: str,
+        side: str,
+        quantity: float,
+        order_type: str = "MARKET",
+        price: float | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> Order | None:
+        """Create and immediately attempt to execute an order."""
+        side_enum = OrderSide[side.upper()]
+        order_type_enum = OrderType[order_type.upper()]
+        order = self.order_manager.create_order(
+            symbol=symbol,
+            side=side_enum,
+            order_type=order_type_enum,
+            quantity=quantity,
+            price=price,
+            metadata=metadata,
+        )
+
+        if order is None:
+            return None
+
+        if self.risk_manager:
+            self.risk_manager.record_order(
+                symbol,
+                side_enum.value,
+                quantity,
+                price or 0.0,
+                metadata,
+            )
+
+        self.execute_order(order)
+        return order
 
     def set_market_data(self, symbol: str, data: pd.DataFrame) -> None:
         """Set market data for a symbol.
@@ -163,6 +206,25 @@ class SimulatedBroker:
             )
             return False
 
+        if self.risk_manager and order.is_buy:
+            requested_notional = fill_quantity * execution_price
+            portfolio_value = (
+                self.portfolio_value if self.portfolio_value > 0 else self.cash_balance
+            )
+            if not self.risk_manager.can_open_position(
+                order.symbol,
+                requested_notional,
+                portfolio_value,
+                order.metadata,
+            ):
+                order.reject("Risk manager blocked order")
+                self._publish_order_event(
+                    order,
+                    EventOrderStatus.REJECTED,
+                    message="Risk manager blocked order",
+                )
+                return False
+
         # Calculate commission
         commission = self._calculate_commission(fill_quantity, execution_price)
 
@@ -196,6 +258,16 @@ class SimulatedBroker:
             fill_price=execution_price,
             commission=commission,
         )
+
+        if self.risk_manager:
+            self.risk_manager.record_fill(
+                order.symbol,
+                order.side.value,
+                fill_quantity,
+                execution_price,
+                self.portfolio_value,
+                order.metadata,
+            )
         return True
 
     def _publish_order_event(

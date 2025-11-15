@@ -10,6 +10,7 @@ from typing import Any
 import pandas as pd
 
 from backtester.core.event_bus import EventBus
+from backtester.core.interfaces import RiskManagerProtocol
 from backtester.portfolio.base_portfolio import BasePortfolio
 from backtester.portfolio.position import Position
 
@@ -34,6 +35,7 @@ class GeneralPortfolio(BasePortfolio):
         logger: logging.Logger | None = None,
         event_bus: EventBus | None = None,
         portfolio_id: str | None = None,
+        risk_manager: RiskManagerProtocol | None = None,
     ) -> None:
         """Initialize the general portfolio.
 
@@ -49,6 +51,7 @@ class GeneralPortfolio(BasePortfolio):
             logger: Optional logger instance
             event_bus: Optional event bus used to broadcast updates
             portfolio_id: Identifier for emitted portfolio events
+            risk_manager: Optional risk manager that centralizes risk checks
         """
         super().__init__(
             initial_capital=initial_capital,
@@ -71,6 +74,7 @@ class GeneralPortfolio(BasePortfolio):
         self.total_commission: float = 0.0
         self.total_slippage: float = 0.0
         self.positions: dict[str, Position] = {}
+        self.risk_manager = risk_manager
 
         self.logger.info(
             f"Initialized GeneralPortfolio with ${initial_capital:.2f} capital, max {max_positions} positions"
@@ -137,6 +141,18 @@ class GeneralPortfolio(BasePortfolio):
             )
             return False
 
+        # Risk manager approval before committing capital
+        if self.risk_manager:
+            portfolio_value = self.total_value or self.initial_capital
+            if not self.risk_manager.can_open_position(
+                symbol,
+                abs(total_position_value),
+                portfolio_value,
+                {'source': 'portfolio_add'},
+            ):
+                self.logger.warning("Risk manager rejected opening %s", symbol)
+                return False
+
         # Deduct from cash
         self.cash -= total_required
 
@@ -179,6 +195,42 @@ class GeneralPortfolio(BasePortfolio):
             f"Opened {symbol} position: {quantity}@{price:.4f}, leverage: {leverage:.1f}x, margin: {margin_required:.2f}"
         )
         return True
+
+    def apply_fill(
+        self,
+        *,
+        symbol: str,
+        side: str,
+        quantity: float,
+        price: float,
+        timestamp: Any,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        """Broadcast an executed fill to the portfolio so holdings stay in sync."""
+        side_normalized = side.upper()
+        metadata = metadata or {}
+
+        if side_normalized == 'BUY':
+            if symbol in self.positions:
+                self.update_position(symbol, quantity, price, timestamp)
+            else:
+                self.add_position(symbol, quantity, price, timestamp)
+        elif side_normalized == 'SELL':
+            if symbol in self.positions:
+                self.close_position(symbol, price, timestamp, quantity=quantity)
+        else:
+            self.logger.debug("Ignoring fill with unsupported side '%s'", side)
+            return
+
+        if self.risk_manager:
+            self.risk_manager.record_fill(
+                symbol,
+                side_normalized,
+                quantity,
+                price,
+                self.total_value,
+                metadata,
+            )
 
     def close_position(
         self,

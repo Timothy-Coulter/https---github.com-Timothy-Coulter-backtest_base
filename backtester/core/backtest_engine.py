@@ -24,7 +24,7 @@ from backtester.core.logger import get_backtester_logger
 from backtester.core.performance import PerformanceAnalyzer
 from backtester.data.data_retrieval import DataRetrieval
 from backtester.execution.broker import SimulatedBroker
-from backtester.execution.order import OrderSide, OrderType
+from backtester.execution.order import OrderStatus, OrderType
 from backtester.portfolio import GeneralPortfolio
 from backtester.risk_management.risk_control_manager import RiskControlManager
 from backtester.strategy.orchestration import (
@@ -364,6 +364,7 @@ class BacktestEngine:
             logger=self.logger,
             event_bus=self.event_bus,
             portfolio_id=self._portfolio_identifier,
+            risk_manager=self.current_risk_manager,
         )
 
         # Update portfolio parameters if provided
@@ -396,6 +397,8 @@ class BacktestEngine:
             self.portfolio_strategy = KellyCriterionStrategy(portfolio_config, self.event_bus)
 
         self.portfolio_strategy.initialize_portfolio(self.current_portfolio)
+        if self.current_risk_manager is not None:
+            self.portfolio_strategy.set_risk_manager(self.current_risk_manager)
 
     def _build_portfolio_strategy_config(
         self, symbols: list[str], portfolio_params: dict[str, Any]
@@ -449,6 +452,10 @@ class BacktestEngine:
             latency_ms=self.config.execution.latency_ms if self.config.execution else 0.0,
             logger=self.logger,
             event_bus=self.event_bus,
+            risk_manager=self.current_risk_manager,
+            initial_cash=(
+                self.current_portfolio.initial_capital if self.current_portfolio else None
+            ),
         )
 
         # Set market data for the broker
@@ -510,10 +517,10 @@ class BacktestEngine:
         self.logger.info("Starting backtest...")
 
         # Create all components
+        self.create_risk_manager()
         self.create_strategy(strategy_params)
         self.create_portfolio(portfolio_params)
         self.create_broker()
-        self.create_risk_manager()
 
         # Reset components
         if self.current_strategy is not None:
@@ -865,16 +872,29 @@ class BacktestEngine:
         metadata.setdefault('symbol', symbol)
 
         assert self.current_broker is not None
-        order = self.current_broker.order_manager.create_order(
+        order = self.current_broker.submit_order(
             symbol=symbol,
-            side=OrderSide[side_raw],
-            order_type=OrderType.MARKET,
+            side=side_raw,
             quantity=quantity,
+            order_type=OrderType.MARKET.value,
             price=price,
             metadata=metadata,
         )
 
-        self.current_broker.execute_order(order)
+        if (
+            order is not None
+            and order.status == OrderStatus.FILLED
+            and self.current_portfolio is not None
+            and order.filled_price is not None
+        ):
+            self.current_portfolio.apply_fill(
+                symbol=symbol,
+                side=side_raw,
+                quantity=order.filled_quantity,
+                price=order.filled_price,
+                timestamp=timestamp,
+                metadata=metadata,
+            )
 
     def _check_risk_management(self, portfolio_value: float) -> None:
         """Check and apply risk management rules.
@@ -886,7 +906,13 @@ class BacktestEngine:
         assert self.current_broker is not None
         positions_dict: dict[str, dict[str, Any]] = {}
         for symbol, position in self.current_broker.positions.items():
-            positions_dict[symbol] = {'active': True, 'market_value': position, 'symbol': symbol}
+            current_price = self.current_broker.get_current_price(symbol)
+            market_value = abs(position) * current_price
+            positions_dict[symbol] = {
+                'active': True,
+                'market_value': market_value,
+                'symbol': symbol,
+            }
 
         # Check portfolio-level risk
         assert self.current_risk_manager is not None
