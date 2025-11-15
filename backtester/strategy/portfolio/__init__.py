@@ -20,6 +20,7 @@ from .portfolio_strategy_config import (
     RiskBudget,
     SignalFilterConfig,
 )
+from .risk_parity_strategy import RiskParityStrategy
 
 __all__ = [
     # Base classes
@@ -28,7 +29,7 @@ __all__ = [
     'EqualWeightStrategy',
     'KellyCriterionStrategy',
     'ModernPortfolioTheoryStrategy',
-    'RiskParityStrategy',  # Will be added when implemented
+    'RiskParityStrategy',
     # Configuration models
     'PortfolioStrategyConfig',
     'PortfolioConstraints',
@@ -42,6 +43,3 @@ __all__ = [
     'OptimizationMethod',
     'RebalanceFrequency',
 ]
-
-# Note: RiskParityStrategy is referenced but not imported yet
-# This will be added when the risk_parity_strategy.py is fully implemented

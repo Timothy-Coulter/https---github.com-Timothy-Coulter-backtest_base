@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, TypeVar
 
-from backtester.core.logger import get_backtester_logger
+from backtester.core.logger import bind_logger_context, get_backtester_logger
 
 # Type variables for generic event handling
 T = TypeVar('T')
@@ -163,7 +163,8 @@ class EventBus:
         Args:
             logger: Logger instance for event bus operations
         """
-        self.logger = logger or get_backtester_logger(__name__)
+        base_logger = logger or get_backtester_logger(__name__)
+        self.logger = bind_logger_context(base_logger)
 
         # Subscription management
         self._filtered_subscriptions: list[EventSubscription] = []
@@ -380,14 +381,17 @@ class EventBus:
         Returns:
             Dictionary of event bus metrics
         """
+        queue_depth = len(self._event_queue)
         return {
             'published_events': self._published_events,
             'processed_events': self._processed_events,
             'dropped_events': self._dropped_events,
-            'queued_events': len(self._event_queue),
+            'queued_events': queue_depth,
+            'queue_depth': queue_depth,
             'active_subscriptions': len(self._filtered_subscriptions),
             'registered_handlers': sum(len(handlers) for handlers in self._event_handlers.values()),
             'processing': self._processing,
+            'is_processing': self._processing,
         }
 
     def reset_metrics(self) -> None:

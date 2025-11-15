@@ -24,6 +24,74 @@ from backtester.main import run_backtest
 results = run_backtest()
 ```
 
+## Architecture Overview
+
+- **Event-driven core:** The `EventBus` fan-outs market, signal, order, and risk
+  events so each subsystem stays decoupled. See `docs/engine_workflow.md` for a
+  diagram of the canonical loop.
+- **Configuration layering:** Global defaults live in `backtester.core.config`,
+  but every run clones those defaults via `BacktestRunConfig` so overrides never
+  leak between experiments. Details live in `docs/configuration.md`.
+- **Extension points:** Strategies, portfolio allocators, brokers, and risk
+  modules are all thin interfaces. Register new implementations through the
+  orchestrator or swap entire modules by instantiating the concrete classes and
+  wiring them into `BacktestEngine`.
+
+## Examples
+
+### Run a quick backtest with an isolated configuration snapshot
+
+```python
+from backtester.core.backtest_engine import BacktestEngine
+from backtester.core.config import BacktestRunConfig, get_config
+
+run_config = (
+    BacktestRunConfig(get_config())
+    .with_data_overrides(tickers=["MSFT"], start_date="2023-01-01", finish_date="2023-06-30")
+    .with_strategy_overrides(ma_short=10, ma_long=40)
+    .build()
+)
+
+engine = BacktestEngine(config=run_config)
+results = engine.run_backtest()
+print(results["performance"]["total_return"])
+```
+
+### Register an additional strategy with the orchestrator
+
+```python
+from backtester.strategy.signal.base_signal_strategy import BaseSignalStrategy
+from backtester.strategy.signal.signal_strategy_config import SignalStrategyConfig
+
+class AlwaysOnStrategy(BaseSignalStrategy):
+    def generate_signals(self, data, symbol):  # noqa: D401 - demo only
+        return [{"signal_type": "BUY", "confidence": 0.5, "symbol": symbol}]
+
+strategy = AlwaysOnStrategy(
+    SignalStrategyConfig(strategy_name="always_on", symbols=["SPY"]), engine.event_bus
+)
+engine.strategy_orchestrator.register_strategy(
+    identifier="always_on",
+    strategy=strategy,
+    kind=strategy.type,
+    priority=1,
+)
+```
+
+### Configure comprehensive risk controls
+
+```python
+from backtester.risk_management import ComprehensiveRiskConfig, RiskControlManager
+
+risk_config = ComprehensiveRiskConfig(
+    max_position_size=0.15,
+    stop_loss_pct=0.02,
+    take_profit_pct=0.08,
+)
+risk_manager = RiskControlManager(config=risk_config, logger=engine.logger, event_bus=engine.event_bus)
+engine.current_risk_manager = risk_manager
+```
+
 ## Event Payload Contract
 
 All components communicate through the event bus using a shared metadata contract. The keys
@@ -60,6 +128,17 @@ The canonical simulation loop—from market data ingestion through strategy sign
 risk evaluation, order routing, broker fills, and portfolio/performance updates—is
 documented in detail (with a Mermaid diagram) in `docs/engine_workflow.md`.
 Reference it when implementing new components or investigating event ordering.
+
+## Observability & Diagnostics
+
+- Every component should obtain its logger via `get_backtester_logger(__name__)`.
+  The helper automatically attaches a `run_id` (per engine instance) and an
+  optional `symbol`, so log aggregators can filter by context with no extra work.
+- `bind_logger_context(logger, symbol="MSFT")` can be used when the same logger
+  needs to emit records for different instruments over time.
+- `PerformanceAnalyzer` now records `operational_metrics` (latency, queue depth,
+  throughput) which are surfaced both in `engine.backtest_results['performance']`
+  and the text report. See `docs/observability.md` for the full reference.
 
 ## Development Commands
 
@@ -122,3 +201,10 @@ uv run ruff format . && uv run black . && uv run isort . && uv run ruff check . 
 # Format, lint, and typecheck
 uv run ruff format . && uv run black . && uv run isort . && uv run ruff check . && uv run mypy .
 ```
+
+### CI Helper Script
+
+Prefer a single command? Run `python scripts/run_ci_checks.py` to execute the
+formatters, `ruff check --fix`, `mypy`, and `pytest` with consistent ordering
+and friendly status output. Pass `--skip-tests` when you only need the fast
+format/lint cycle.

@@ -10,6 +10,7 @@ import pytest
 
 from backtester.core.performance import (
     DrawdownAnalyzer,
+    PerformanceAnalyzer,
     PerformanceCalculator,
     PerformanceMetrics,
     ReturnAnalyzer,
@@ -456,6 +457,50 @@ def test_sharpe_ratio_parametrized(returns: list[float], expected_sharpe: str) -
     else:
         # This case should not occur with current test data
         raise AssertionError(f"Unexpected expected_sharpe value: {expected_sharpe}")
+
+
+class TestOperationalMetrics:
+    """Tests for operational metrics instrumentation."""
+
+    def test_record_operational_sample_tracks_extremes(self) -> None:
+        """Operational samples should update aggregated snapshots."""
+        analyzer = PerformanceAnalyzer()
+        analyzer.record_operational_sample(
+            latency_ms=5.0,
+            queue_depth=2,
+            events_processed=10,
+            throughput_per_second=2000.0,
+        )
+        analyzer.record_operational_sample(
+            latency_ms=8.0,
+            queue_depth=5,
+            events_processed=5,
+            throughput_per_second=1500.0,
+        )
+
+        metrics = analyzer.get_operational_metrics()
+        assert metrics.samples == 2
+        assert metrics.max_latency_ms == pytest.approx(8.0)
+        assert metrics.max_queue_depth == 5
+        assert metrics.total_events_processed == 15
+        assert metrics.avg_latency_ms > 0
+
+    def test_comprehensive_analysis_includes_operational_metrics(self) -> None:
+        """Operational metrics should be surfaced in comprehensive results."""
+        analyzer = PerformanceAnalyzer()
+        analyzer.record_operational_sample(
+            latency_ms=1.0,
+            queue_depth=1,
+            events_processed=1,
+            throughput_per_second=100.0,
+        )
+
+        prices = pd.Series([100, 101, 102, 103])
+        results = analyzer.comprehensive_analysis(prices)
+
+        assert 'operational_metrics' in results
+        ops = results['operational_metrics']
+        assert ops['samples'] == 1
 
 
 if __name__ == "__main__":

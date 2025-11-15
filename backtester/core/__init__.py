@@ -3,6 +3,7 @@
 from backtester.core.backtest_engine import BacktestEngine
 from backtester.core.config import (
     BacktesterConfig,
+    BacktestRunConfig,
     ComprehensiveRiskConfig,
     DataRetrievalConfig,
     ExecutionConfig,
@@ -57,27 +58,27 @@ from backtester.core.interfaces import (
     RiskManagerProtocol,
     StrategyProtocol,
 )
-from backtester.core.logger import get_backtester_logger
-from backtester.core.performance import PerformanceAnalyzer
+from backtester.core.logger import bind_logger_context, get_backtester_logger
+from backtester.core.performance import OperationalMetrics, PerformanceAnalyzer
 
 __all__ = [
     # Core components
     'BacktestEngine',
     'BacktesterConfig',
+    'BacktestRunConfig',
     'ComprehensiveRiskConfig',
     'DataRetrievalConfig',
     'StrategyConfig',
     'PortfolioConfig',
     'ExecutionConfig',
-    'RiskConfig',
     'PerformanceConfig',
-    'BacktestConfig',
-    'ConfigValidator',
     'get_config',
     'set_config',
     'reset_config',
+    'bind_logger_context',
     'get_backtester_logger',
     'PerformanceAnalyzer',
+    'OperationalMetrics',
     'StrategyProtocol',
     'PortfolioProtocol',
     'BrokerProtocol',

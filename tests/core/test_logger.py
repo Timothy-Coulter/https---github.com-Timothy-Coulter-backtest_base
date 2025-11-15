@@ -12,7 +12,7 @@ import pytest
 
 # Import the modules being tested
 try:
-    from backtester.core.logger import BacktesterLogger, LogFormat, LogLevel
+    from backtester.core.logger import BacktesterLogger, LogFormat, LogLevel, get_backtester_logger
 except ImportError as e:
     pytest.skip(f"Could not import backtester modules: {e}", allow_module_level=True)
 
@@ -331,6 +331,33 @@ class TestBacktesterLogger:
 
             # Verify that performance metrics are logged
             assert mock_logger_instance.info.call_count > 0
+
+    def test_get_backtester_logger_attaches_context(self) -> None:
+        """get_backtester_logger should inject run/symbol context."""
+
+        class _ListHandler(logging.Handler):
+            def __init__(self) -> None:
+                super().__init__()
+                self.records: list[logging.LogRecord] = []
+
+            def emit(self, record: logging.LogRecord) -> None:
+                self.records.append(record)
+
+        handler = _ListHandler()
+        logger = get_backtester_logger("test_context_logger", run_id="demo-run", symbol="MSFT")
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+        logger.propagate = False
+
+        try:
+            logger.info("context message")
+        finally:
+            logger.removeHandler(handler)
+
+        assert handler.records, "Expected at least one log record"
+        record = handler.records[-1]
+        assert record.run_id == "demo-run"
+        assert record.symbol == "MSFT"
 
 
 class TestLogLevel:

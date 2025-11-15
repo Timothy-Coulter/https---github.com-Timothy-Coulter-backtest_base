@@ -2,4 +2,4 @@
 
 from backtester.data.data_retrieval import DataRetrieval
 
-__all__ = ['DataRetrieval', 'DataHandler', 'get_data']
+__all__ = ['DataRetrieval']

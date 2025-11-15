@@ -91,18 +91,108 @@ class StructuredFormatter(logging.Formatter):
         return json.dumps(log_entry, default=str)
 
 
+class LoggerContextFilter(logging.Filter):
+    """Ensure every record has consistent contextual metadata."""
+
+    def __init__(
+        self,
+        run_id: str | None = None,
+        symbol: str | None = None,
+        *,
+        is_default: bool = False,
+    ) -> None:
+        """Initialize the filter with optional context overrides."""
+        super().__init__()
+        self.run_id = run_id
+        self.symbol = symbol
+        self.is_default = is_default
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        """Inject contextual attributes if they are missing."""
+        if self.run_id is not None:
+            record.run_id = self.run_id
+        elif getattr(record, 'run_id', None) is None:
+            record.run_id = '-'
+
+        if self.symbol is not None:
+            record.symbol = self.symbol
+        elif getattr(record, 'symbol', None) is None:
+            record.symbol = '-'
+        return True
+
+
+ROOT_LOGGER_NAME = "backtester"
+
+
+def _normalized_logger_name(name: str) -> str:
+    if not name or name == ROOT_LOGGER_NAME:
+        return ROOT_LOGGER_NAME
+    if name.startswith(f"{ROOT_LOGGER_NAME}."):
+        return name
+    return f"{ROOT_LOGGER_NAME}.{name}"
+
+
+def _ensure_default_context(filterable: logging.Filterer) -> None:
+    """Attach a default context filter so templates can reference run_id/symbol safely."""
+    for existing in filterable.filters:
+        if isinstance(existing, LoggerContextFilter) and existing.is_default:
+            return
+    filterable.addFilter(LoggerContextFilter(is_default=True))
+
+
+def _replace_context_filter(logger: logging.Logger, context_filter: LoggerContextFilter) -> None:
+    """Ensure only a single non-default context filter is attached to the logger."""
+    for existing in list(logger.filters):
+        if isinstance(existing, LoggerContextFilter) and not existing.is_default:
+            logger.removeFilter(existing)
+    logger.addFilter(context_filter)
+
+
+def bind_logger_context(
+    logger: logging.Logger,
+    *,
+    run_id: str | None = None,
+    symbol: str | None = None,
+) -> logging.Logger:
+    """Bind contextual metadata to an existing logger instance."""
+    current_run_id: str | None = None
+    current_symbol: str | None = None
+    for existing in logger.filters:
+        if isinstance(existing, LoggerContextFilter) and not existing.is_default:
+            current_run_id = existing.run_id
+            current_symbol = existing.symbol
+            break
+
+    new_run_id = run_id if run_id is not None else current_run_id
+    new_symbol = symbol if symbol is not None else current_symbol
+
+    if new_run_id is None and new_symbol is None:
+        return logger
+
+    _replace_context_filter(logger, LoggerContextFilter(run_id=new_run_id, symbol=new_symbol))
+    return logger
+
+
 # Utility functions for easy access
-def get_backtester_logger(name: str = "backtester", **kwargs: Any) -> logging.Logger:
-    """Get a backtester logger with default settings.
-
-    Args:
-        name: Logger name
-        **kwargs: Additional arguments for logger configuration
-
-    Returns:
-        Configured logger
-    """
-    return BacktesterLogger.get_logger(name, **kwargs)
+def get_backtester_logger(
+    name: str = ROOT_LOGGER_NAME,
+    *,
+    run_id: str | None = None,
+    symbol: str | None = None,
+    **kwargs: Any,
+) -> logging.Logger:
+    """Get a backtester logger with default settings and contextual metadata."""
+    root_logger = BacktesterLogger.get_logger(ROOT_LOGGER_NAME, **kwargs)
+    normalized_name = _normalized_logger_name(name)
+    if normalized_name == root_logger.name:
+        target_logger = root_logger
+    else:
+        relative_name = normalized_name.split(f"{ROOT_LOGGER_NAME}.", 1)[1]
+        target_logger = root_logger.getChild(relative_name)
+        _ensure_default_context(target_logger)
+    if run_id is not None or symbol is not None:
+        return bind_logger_context(target_logger, run_id=run_id, symbol=symbol)
+    return target_logger
 
 
 class BacktesterLogger:
@@ -170,7 +260,8 @@ class BacktesterLogger:
             formatter: logging.Formatter = StructuredFormatter()
         else:
             formatter = logging.Formatter(
-                '%(asctime)s - %(name)s - %(levelname)s - %(module)s:%(funcName)s:%(lineno)d - %(message)s'
+                '%(asctime)s | %(levelname)s | %(name)s | run=%(run_id)s symbol=%(symbol)s | '
+                '%(module)s:%(funcName)s:%(lineno)d | %(message)s'
             )
 
         # Add console handler
@@ -178,17 +269,22 @@ class BacktesterLogger:
             console_handler = logging.StreamHandler(sys.stdout)
             console_handler.setFormatter(formatter)
             logger.addHandler(console_handler)
+            _ensure_default_context(console_handler)
 
         # Add file handler if specified
         if file_path:
-            # Ensure directory exists
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            directory = os.path.dirname(file_path)
+            if directory:
+                os.makedirs(directory, exist_ok=True)
 
             file_handler = logging.handlers.RotatingFileHandler(
                 file_path, maxBytes=max_file_size, backupCount=backup_count
             )
             file_handler.setFormatter(formatter)
             logger.addHandler(file_handler)
+            _ensure_default_context(file_handler)
+
+        _ensure_default_context(logger)
 
         # Store logger
         cls._loggers[name] = logger

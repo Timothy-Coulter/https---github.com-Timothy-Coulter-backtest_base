@@ -1,6 +1,7 @@
 """Tests for the event bus system."""
 
 import time
+from unittest.mock import patch
 
 import pytest
 
@@ -404,6 +405,24 @@ class TestEventBus:
         assert self.handler_called is True
         # Error should be logged but not propagate
         assert self.event_bus._dropped_events == 0
+
+    def test_get_metrics_reports_queue_and_counts(self):
+        """get_metrics should expose queue depth and processed counts."""
+        event = Event(event_type="TEST_EVENT", timestamp=time.time(), source="unittest")
+
+        with patch.object(self.event_bus, "_process_queued_events") as mock_process:
+            mock_process.side_effect = lambda: None
+            self.event_bus.publish(event)
+
+        metrics = self.event_bus.get_metrics()
+        assert metrics['published_events'] == 1
+        assert metrics['queue_depth'] == 1
+        assert metrics['processed_events'] == 0
+
+        self.event_bus._process_queued_events()
+        metrics = self.event_bus.get_metrics()
+        assert metrics['queue_depth'] == 0
+        assert metrics['processed_events'] >= 1
 
     def test_clear_queue(self):
         """Test clearing event queue."""

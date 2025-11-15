@@ -24,6 +24,7 @@ class PerformanceAnalyzer:
         """
         self.logger: logging.Logger = logger or logging.getLogger(__name__)
         self.risk_free_rate: float = risk_free_rate
+        self.operational_metrics = OperationalMetrics()
 
     def calculate_returns(self, prices: pd.Series) -> pd.Series:
         """Calculate returns from price series.
@@ -327,6 +328,41 @@ class PerformanceAnalyzer:
 
         return avg_win / avg_loss
 
+    def record_operational_sample(
+        self,
+        *,
+        latency_ms: float,
+        queue_depth: int,
+        events_processed: int,
+        throughput_per_second: float,
+    ) -> None:
+        """Record an operational telemetry sample for diagnostics."""
+        metrics = self.operational_metrics
+        metrics.samples += 1
+        metrics.avg_latency_ms = self._update_running_average(
+            metrics.avg_latency_ms, latency_ms, metrics.samples
+        )
+        metrics.avg_queue_depth = self._update_running_average(
+            metrics.avg_queue_depth, float(queue_depth), metrics.samples
+        )
+        metrics.avg_throughput_per_sec = self._update_running_average(
+            metrics.avg_throughput_per_sec, throughput_per_second, metrics.samples
+        )
+        metrics.max_latency_ms = max(metrics.max_latency_ms, latency_ms)
+        metrics.max_queue_depth = max(metrics.max_queue_depth, queue_depth)
+        metrics.total_events_processed += max(events_processed, 0)
+
+    def get_operational_metrics(self) -> 'OperationalMetrics':
+        """Return the aggregated operational telemetry snapshot."""
+        return self.operational_metrics
+
+    @staticmethod
+    def _update_running_average(current: float, new_value: float, samples: int) -> float:
+        """Update a running average without storing historical samples."""
+        if samples <= 0:
+            return current
+        return current + (new_value - current) / samples
+
     def comprehensive_analysis(
         self, portfolio_values: pd.Series, benchmark_values: pd.Series | None = None
     ) -> dict[str, Any]:
@@ -408,6 +444,9 @@ class PerformanceAnalyzer:
                 }
             )
 
+        if self.operational_metrics.samples > 0:
+            results['operational_metrics'] = self.operational_metrics.to_dict()
+
         return results
 
     def generate_report(self, analysis_results: dict[str, Any]) -> str:
@@ -445,6 +484,19 @@ class PerformanceAnalyzer:
         report.append(f"Profit Factor:          {analysis_results['profit_factor']:.3f}")
         report.append(f"Avg Win/Loss Ratio:     {analysis_results['avg_win_loss_ratio']:.3f}")
 
+        operational = analysis_results.get('operational_metrics')
+        if operational:
+            report.append("\nOPERATIONAL METRICS:")
+            report.append(f"Samples Captured:       {operational['samples']}")
+            report.append(f"Avg Tick Latency:       {operational['avg_latency_ms']:.2f} ms")
+            report.append(f"Peak Tick Latency:      {operational['max_latency_ms']:.2f} ms")
+            report.append(f"Avg Queue Depth:        {operational['avg_queue_depth']:.2f}")
+            report.append(f"Peak Queue Depth:       {operational['max_queue_depth']}")
+            report.append(f"Events Processed:       {operational['total_events_processed']}")
+            report.append(
+                f"Avg Throughput:         {operational['avg_throughput_per_sec']:.2f} ev/s"
+            )
+
         # Benchmark comparisons
         if 'benchmark_total_return' in analysis_results:
             report.append("\nBENCHMARK COMPARISON:")
@@ -459,6 +511,31 @@ class PerformanceAnalyzer:
         report.append("\n" + "=" * 60)
 
         return "\n".join(report)
+
+
+@dataclass
+class OperationalMetrics:
+    """Aggregated operational telemetry for diagnostics."""
+
+    samples: int = 0
+    avg_latency_ms: float = 0.0
+    max_latency_ms: float = 0.0
+    avg_queue_depth: float = 0.0
+    max_queue_depth: int = 0
+    total_events_processed: int = 0
+    avg_throughput_per_sec: float = 0.0
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize the metrics for reporting."""
+        return {
+            'samples': self.samples,
+            'avg_latency_ms': self.avg_latency_ms,
+            'max_latency_ms': self.max_latency_ms,
+            'avg_queue_depth': self.avg_queue_depth,
+            'max_queue_depth': self.max_queue_depth,
+            'total_events_processed': self.total_events_processed,
+            'avg_throughput_per_sec': self.avg_throughput_per_sec,
+        }
 
 
 # Legacy compatibility classes for tests

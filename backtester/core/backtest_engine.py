@@ -6,6 +6,7 @@ portfolio management, risk management, and performance analysis.
 """
 
 import logging
+import time
 import uuid
 import warnings
 from typing import Any
@@ -24,7 +25,7 @@ from backtester.core.events import (
     create_order_event,
     create_risk_alert_event,
 )
-from backtester.core.logger import get_backtester_logger
+from backtester.core.logger import bind_logger_context, get_backtester_logger
 from backtester.core.performance import PerformanceAnalyzer
 from backtester.data.data_retrieval import DataRetrieval
 from backtester.execution.broker import SimulatedBroker
@@ -127,14 +128,26 @@ class BacktestEngine:
         """
         base_config = config or get_config()
         self.config: BacktesterConfig = BacktestRunConfig(base_config).build()
-        self.logger: logging.Logger = logger or get_backtester_logger(__name__)
+        self.run_id = uuid.uuid4().hex[:8]
+        if logger is not None:
+            self.logger = bind_logger_context(logger, run_id=self.run_id)
+        else:
+            self.logger = get_backtester_logger(__name__, run_id=self.run_id)
         self.event_bus: EventBus
 
         if strategy_orchestrator is not None:
             self.strategy_orchestrator: BaseStrategyOrchestrator = strategy_orchestrator
             self.event_bus = event_bus or strategy_orchestrator.event_bus
+            if hasattr(self.event_bus, 'logger'):
+                bind_logger_context(self.event_bus.logger, run_id=self.run_id)
         else:
-            self.event_bus = event_bus or EventBus()
+            if event_bus is not None:
+                self.event_bus = event_bus
+                if hasattr(self.event_bus, 'logger'):
+                    bind_logger_context(self.event_bus.logger, run_id=self.run_id)
+            else:
+                bus_logger = get_backtester_logger(f"{__name__}.event_bus", run_id=self.run_id)
+                self.event_bus = EventBus(logger=bus_logger)
             default_config = OrchestrationConfig(
                 orchestrator_type=OrchestratorType.SEQUENTIAL,
                 strategies=[
@@ -194,6 +207,7 @@ class BacktestEngine:
         self.backtest_results: dict[str, Any] = {}
         self.trade_history: list[dict[str, Any]] = []
         self.performance_metrics: dict[str, Any] = {}
+        self._last_event_bus_processed = 0
 
         self.logger.info("Backtest engine initialized")
 
@@ -659,8 +673,11 @@ class BacktestEngine:
         simulation_symbol = tickers[0] if isinstance(tickers, list) else tickers
         periods = max(len(self.current_data) - 1, 0)
         self.logger.info("Running simulation loop (%s periods)...", periods)
+        bus_snapshot = self.event_bus.get_metrics()
+        self._last_event_bus_processed = bus_snapshot['processed_events']
 
         for i in range(periods):
+            tick_start = time.perf_counter()
             # Clear signal/order buffers from previous tick
             self._signal_collector.drain()
             self._order_collector.drain()
@@ -772,6 +789,21 @@ class BacktestEngine:
                 'risk_level': post_trade_risk.get('risk_level'),
             }
             self._fire_tick_hook('after', tick_context, tick_results)
+
+            if self.performance_analyzer is not None:
+                latency_ms = (time.perf_counter() - tick_start) * 1000.0
+                bus_metrics = self.event_bus.get_metrics()
+                processed_total = bus_metrics['processed_events']
+                processed_delta = max(processed_total - self._last_event_bus_processed, 0)
+                self._last_event_bus_processed = processed_total
+                elapsed_seconds = max(latency_ms / 1000.0, 1e-6)
+                throughput = processed_delta / elapsed_seconds if processed_delta else 0.0
+                self.performance_analyzer.record_operational_sample(
+                    latency_ms=latency_ms,
+                    queue_depth=bus_metrics['queue_depth'],
+                    events_processed=processed_delta,
+                    throughput_per_second=throughput,
+                )
 
             if (i + 1) % 50 == 0 or i == periods - 1:
                 self.logger.debug("Processed %s/%s periods", i + 1, periods)

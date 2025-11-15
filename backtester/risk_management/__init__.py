@@ -16,6 +16,7 @@ from backtester.risk_management.component_configs.take_profit_config import Take
 
 # Core risk management classes
 from backtester.risk_management.position_sizing import PositionSizer
+from backtester.risk_management.risk_control_manager import RiskControlManager
 from backtester.risk_management.risk_limits import RiskLimits
 from backtester.risk_management.risk_metrics_calculator import RiskMetricsCalculator
 from backtester.risk_management.risk_monitor import RiskMonitor
