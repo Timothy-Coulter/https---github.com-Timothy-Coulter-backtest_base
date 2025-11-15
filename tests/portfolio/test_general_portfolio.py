@@ -7,6 +7,7 @@ used for multi-asset portfolio management.
 from datetime import datetime
 
 import pandas as pd
+import pytest
 
 from backtester.portfolio.general_portfolio import GeneralPortfolio
 
@@ -278,3 +279,64 @@ class TestGeneralPortfolio:
             timestamp=timestamp,
         )
         assert 'AAPL' not in portfolio.positions
+
+    def test_process_tick_applies_financing_costs(self) -> None:
+        """process_tick should deduct financing costs for leveraged positions."""
+        portfolio = GeneralPortfolio(
+            initial_capital=1000.0,
+            commission_rate=0.0,
+            spread_rate=0.0,
+            slippage_std=0.0,
+            interest_rate_daily=0.01,
+        )
+        portfolio.add_position('AAPL', 10, 100.0, datetime(2023, 1, 1))
+        cash_before = portfolio.cash
+
+        result = portfolio.process_tick(
+            timestamp=datetime(2023, 1, 2),
+            market_data={'AAPL': pd.DataFrame([{'Close': 120.0, 'High': 121.0, 'Low': 119.0}])},
+        )
+
+        expected_cost = 10 * 120.0 * 0.01
+        assert result['position_count'] == 1
+        assert pytest.approx(result['financing_cost']) == pytest.approx(expected_cost)
+        assert pytest.approx(portfolio.cash) == pytest.approx(cash_before - expected_cost)
+
+    @pytest.mark.parametrize(
+        "day_high,day_low,expected_reason",
+        [
+            (106.0, 100.0, 'TAKE_PROFIT'),
+            (100.0, 94.0, 'STOP_LOSS'),
+        ],
+    )
+    def test_process_tick_closes_positions_on_thresholds(
+        self, day_high: float, day_low: float, expected_reason: str
+    ) -> None:
+        """Stop-loss and take-profit levels should close positions and log trades."""
+        portfolio = GeneralPortfolio(
+            initial_capital=1000.0,
+            commission_rate=0.0,
+            spread_rate=0.0,
+            slippage_std=0.0,
+        )
+        portfolio.add_position(
+            'AAPL',
+            10,
+            100.0,
+            datetime(2023, 1, 1),
+            stop_loss_price=95.0,
+            take_profit_price=105.0,
+        )
+
+        result = portfolio.process_tick(
+            timestamp=datetime(2023, 1, 2),
+            market_data={
+                'AAPL': pd.DataFrame([{'Close': day_high, 'High': day_high, 'Low': day_low}])
+            },
+        )
+
+        assert result['position_updates'][0]['close_reason'] == expected_reason
+        assert 'AAPL' not in portfolio.positions
+        assert result['position_count'] == 0
+        assert portfolio.trade_log[-1]['action'] == 'CLOSE'
+        assert portfolio.trade_log[-1]['reason'] == expected_reason

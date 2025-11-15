@@ -249,3 +249,58 @@ class TestDualPoolPortfolio:
         assert 'leverage' in summary['alpha_pool']
         assert 'active' in summary['alpha_pool']
         assert 'available_capital' in summary['alpha_pool']
+
+    def test_process_tick_triggers_stop_loss_and_logs_trade(self) -> None:
+        """process_tick should emit exit reasons and trade logs when limits breach."""
+        portfolio = DualPoolPortfolio(
+            initial_capital=1000.0,
+            stop_loss_base=0.05,
+            stop_loss_alpha=0.05,
+            take_profit_target=0.10,
+            commission_rate=0.0,
+            spread_rate=0.0,
+            slippage_std=0.0,
+            funding_enabled=False,
+        )
+
+        portfolio.process_tick(
+            timestamp=datetime(2023, 1, 1), current_price=100.0, day_high=100.0, day_low=100.0
+        )
+
+        result = portfolio.process_tick(
+            timestamp=datetime(2023, 1, 2), current_price=100.0, day_high=101.0, day_low=90.0
+        )
+
+        assert result['base_exit'] == 'STOP_LOSS'
+        assert result['alpha_exit'] == 'STOP_LOSS'
+        assert len(portfolio.trade_log) == 1
+        trade = portfolio.trade_log[0]
+        assert trade['base_exit'] == 'STOP_LOSS'
+        assert trade['alpha_exit'] == 'STOP_LOSS'
+
+    def test_process_tick_take_profit_logs_trade(self) -> None:
+        """A strong move in favour of the pools should trigger take-profit exits."""
+        portfolio = DualPoolPortfolio(
+            initial_capital=1000.0,
+            take_profit_target=0.05,
+            commission_rate=0.0,
+            spread_rate=0.0,
+            slippage_std=0.0,
+            funding_enabled=False,
+        )
+
+        portfolio.process_tick(
+            timestamp=datetime(2023, 1, 1), current_price=100.0, day_high=100.0, day_low=100.0
+        )
+
+        result = portfolio.process_tick(
+            timestamp=datetime(2023, 1, 2), current_price=100.0, day_high=110.0, day_low=99.0
+        )
+
+        assert result['base_exit'] == 'TAKE_PROFIT'
+        assert result['alpha_exit'] == 'TAKE_PROFIT'
+        assert portfolio.trade_log
+        trade = portfolio.trade_log[-1]
+        assert trade['base_exit'] == 'TAKE_PROFIT'
+        assert trade['alpha_exit'] == 'TAKE_PROFIT'
+        assert trade['base_capital_change'] != 0

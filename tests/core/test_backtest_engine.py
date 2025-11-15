@@ -58,6 +58,34 @@ class TestBacktestEngine:
             with pytest.raises(Exception, match="Failed to load data"):
                 engine.load_data('INVALID', '2020-01-01', '2024-01-01', '1mo')
 
+    def test_load_data_applies_overrides(
+        self, mock_config: BacktesterConfig, test_data: pd.DataFrame
+    ) -> None:
+        """load_data should forward override arguments to the data handler."""
+        engine = BacktestEngine(config=mock_config)
+        engine.data_handler = Mock()
+
+        captured_config: dict[str, Any] = {}
+
+        def fake_get_data(data_config: Any) -> pd.DataFrame:
+            captured_config['tickers'] = list(data_config.tickers or [])
+            captured_config['start_date'] = data_config.start_date
+            captured_config['finish_date'] = data_config.finish_date
+            captured_config['freq'] = data_config.freq
+            return test_data
+
+        engine.data_handler.get_data.side_effect = fake_get_data
+
+        result = engine.load_data(
+            ticker='QQQ', start_date='2021-01-01', end_date='2021-06-30', interval='1h'
+        )
+
+        assert result is test_data
+        assert captured_config['tickers'] == ['QQQ']
+        assert captured_config['start_date'] == '2021-01-01'
+        assert captured_config['finish_date'] == '2021-06-30'
+        assert captured_config['freq'] == '1h'
+
     def test_run_backtest_success(
         self, test_data: pd.DataFrame, mock_config: BacktesterConfig
     ) -> None:
@@ -341,6 +369,151 @@ class TestBacktestEngine:
         assert engine1 is not engine2
         assert engine1.config == engine2.config
         assert engine1.data_handler is not engine2.data_handler
+
+    def test_process_signals_executes_orders_when_allowed(
+        self, mock_config: BacktesterConfig, test_data: pd.DataFrame
+    ) -> None:
+        """Ensure signal processing calls the strategy path and executes orders."""
+        engine = BacktestEngine(config=mock_config)
+        engine.current_portfolio = Mock()
+        engine.current_portfolio.process_tick.return_value = {'total_value': 1250.0}
+        engine.portfolio_strategy = Mock()
+        engine.portfolio_strategy.calculate_target_weights.return_value = {'SPY': 1.0}
+        engine.portfolio_strategy.process_signals.return_value = [
+            {'symbol': 'SPY', 'side': 'BUY', 'quantity': 2.0}
+        ]
+        executed_orders = [
+            {
+                'symbol': 'SPY',
+                'side': 'BUY',
+                'filled_quantity': 2.0,
+                'filled_price': 101.0,
+                'metadata': {},
+            }
+        ]
+
+        with patch.object(engine, '_execute_orders', return_value=executed_orders) as mock_exec:
+            result = engine._process_signals_and_update_portfolio(
+                signals=[{'signal_type': 'BUY', 'quantity': 2}],
+                current_price=101.0,
+                day_high=102.0,
+                day_low=99.0,
+                timestamp=pd.Timestamp("2023-01-02"),
+                symbol='SPY',
+                historical_data=test_data.tail(5),
+                allow_execution=True,
+            )
+
+        mock_exec.assert_called_once()
+        assert result['executed_orders'] == executed_orders
+        market_data = engine.current_portfolio.process_tick.call_args.kwargs['market_data']
+        assert 'SPY' in market_data
+        assert list(market_data['SPY'].columns) == ['open', 'high', 'low', 'close', 'volume']
+
+    def test_process_signals_skips_execution_when_risk_denies(
+        self, mock_config: BacktesterConfig, test_data: pd.DataFrame
+    ) -> None:
+        """Orders should not be executed when risk constraints block execution."""
+        engine = BacktestEngine(config=mock_config)
+        engine.portfolio_strategy = None
+        engine.current_portfolio = Mock()
+        engine.current_portfolio.process_tick.return_value = {'total_value': 1100.0}
+
+        with patch.object(engine, '_execute_orders') as mock_exec:
+            result = engine._process_signals_and_update_portfolio(
+                signals=[{'signal_type': 'BUY', 'quantity': 1}],
+                current_price=100.0,
+                day_high=101.0,
+                day_low=99.0,
+                timestamp=pd.Timestamp("2023-01-02"),
+                symbol='SPY',
+                historical_data=test_data.head(3),
+                allow_execution=False,
+            )
+
+        mock_exec.assert_not_called()
+        assert result['executed_orders'] == []
+
+    def test_evaluate_portfolio_risk_records_signal(self, mock_config: BacktesterConfig) -> None:
+        """_evaluate_portfolio_risk should forward snapshots to the risk manager."""
+        engine = BacktestEngine(config=mock_config)
+        broker = Mock()
+        broker.positions = {'SPY': 2.0}
+        broker.get_current_price.return_value = 101.0
+        broker.order_manager.cancel_all_orders = Mock()
+        engine.current_broker = broker
+        engine.current_risk_manager = Mock()
+        engine.current_risk_manager.check_portfolio_risk.return_value = {
+            'risk_level': 'LOW',
+            'violations': [],
+        }
+        engine.event_bus = Mock()
+
+        result = engine._evaluate_portfolio_risk(
+            2500.0, stage='pre-trade', timestamp=pd.Timestamp("2023-01-02")
+        )
+
+        engine.current_risk_manager.check_portfolio_risk.assert_called_once()
+        assert result['stage'] == 'pre-trade'
+        assert result['timestamp'] is not None
+        engine.current_risk_manager.add_risk_signal.assert_called_once()
+        broker.order_manager.cancel_all_orders.assert_not_called()
+        engine.event_bus.publish.assert_not_called()
+
+    def test_evaluate_portfolio_risk_emits_alert_on_high_risk(
+        self, mock_config: BacktesterConfig
+    ) -> None:
+        """High-risk results should cancel orders and publish alerts."""
+        engine = BacktestEngine(config=mock_config)
+        broker = Mock()
+        broker.positions = {'SPY': 5.0}
+        broker.get_current_price.return_value = 105.0
+        broker.order_manager.cancel_all_orders = Mock()
+        engine.current_broker = broker
+        engine.current_risk_manager = Mock()
+        engine.current_risk_manager.check_portfolio_risk.return_value = {
+            'risk_level': 'CRITICAL',
+            'violations': ['Max leverage exceeded'],
+        }
+        engine.event_bus = Mock()
+        engine.trade_history = []
+
+        result = engine._evaluate_portfolio_risk(
+            5000.0, stage='post-trade', timestamp=pd.Timestamp("2023-01-03")
+        )
+
+        broker.order_manager.cancel_all_orders.assert_called_once()
+        engine.event_bus.publish.assert_called_once()
+        assert engine.trade_history[-1]['event'] == 'RISK_ALERT'
+        assert result['risk_level'] == 'CRITICAL'
+
+    def test_calculate_performance_metrics_uses_analyzer(
+        self, mock_config: BacktesterConfig
+    ) -> None:
+        """_calculate_performance_metrics should combine analyzer output with portfolio stats."""
+        engine = BacktestEngine(config=mock_config)
+        engine.current_portfolio = Mock()
+        engine.current_portfolio.portfolio_values = [1000.0, 1050.0, 1100.0]
+        engine.current_portfolio.trade_log = [{'action': 'OPEN'}, {'action': 'CLOSE'}]
+        engine.current_portfolio.cumulative_tax = 12.5
+        engine.current_portfolio.total_value = 1200.0
+        engine.performance_analyzer = Mock()
+        engine.performance_analyzer.comprehensive_analysis.return_value = {
+            'total_return': 0.1,
+            'sharpe_ratio': 1.2,
+        }
+        engine.data_handler = Mock()
+        engine.data_handler.get_data.return_value = pd.DataFrame({'Close': [10, 11, 12]})
+        assert engine.config.performance is not None
+        engine.config.performance.benchmark_enabled = True
+
+        metrics = engine._calculate_performance_metrics()
+
+        engine.performance_analyzer.comprehensive_analysis.assert_called_once()
+        assert metrics['total_trades'] == 2
+        assert metrics['cumulative_tax'] == 12.5
+        assert metrics['base_pool_final'] == engine.current_portfolio.total_value / 2
+        assert 'final_portfolio_value' in metrics
 
 
 if __name__ == "__main__":
