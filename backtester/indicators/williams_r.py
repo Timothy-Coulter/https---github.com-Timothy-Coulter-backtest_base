@@ -23,17 +23,15 @@ class WilliamsROscillator(BaseIndicator):
     above -20 are considered overbought.
     """
 
-    def __init__(self, config: IndicatorConfig) -> None:
-        """Initialize Williams %R indicator.
-
-        Args:
-            config: Williams %R configuration parameters
-        """
-        super().__init__(config)
-
-        # Override config values to ensure Williams %R-specific defaults
-        if self.type != "momentum":
-            self.config.indicator_type = "momentum"
+    @classmethod
+    def default_config(cls) -> IndicatorConfig:
+        """Return the canonical Williams %R configuration."""
+        return IndicatorConfig(
+            indicator_name="williams_r",
+            factory_name="williams_r",
+            indicator_type="momentum",
+            williams_r_period=14,
+        )
 
     def calculate(self, data: pd.DataFrame) -> pd.DataFrame:
         """Calculate Williams %R values.

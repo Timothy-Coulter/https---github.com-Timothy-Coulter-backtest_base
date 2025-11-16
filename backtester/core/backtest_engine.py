@@ -323,6 +323,24 @@ class BacktestEngine:
         self.logger.info(f"Created strategy: {self.current_strategy.name}")
         return self.current_strategy
 
+    def _build_momentum_config(
+        self,
+        overrides: dict[str, Any],
+        strategy_name: str,
+    ) -> MomentumStrategyConfig:
+        """Compatibility shim used by integration tests to spawn extra strategies."""
+        base_strategy_config = self.config.strategy or StrategyConfig()
+        data_config = self.config.data or DataRetrieval.default_config()
+        raw_symbols = data_config.tickers or ["SPY"]
+        symbols = [raw_symbols] if isinstance(raw_symbols, str) else list(raw_symbols)
+        merged_overrides = dict(overrides)
+        merged_overrides.setdefault('strategy_name', strategy_name)
+        return build_momentum_strategy_config(
+            base_strategy_config,
+            symbols=symbols,
+            overrides=merged_overrides,
+        )
+
     def create_portfolio(self, portfolio_params: dict[str, Any] | None = None) -> GeneralPortfolio:
         """Create portfolio instance.
 
@@ -402,6 +420,7 @@ class BacktestEngine:
         execution_config = self.config.execution or SimulatedBroker.default_config()
         self.current_broker = SimulatedBroker(
             config=execution_config,
+            config_processor=self._config_processor,
             logger=self.logger,
             event_bus=self.event_bus,
             risk_manager=self.current_risk_manager,

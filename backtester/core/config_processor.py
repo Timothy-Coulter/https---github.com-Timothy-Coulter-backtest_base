@@ -142,6 +142,50 @@ class ConfigProcessor:
             return value.model_copy(deep=True)
         return cast(BaseModel | None, value)
 
+    def resolve_component(
+        self,
+        component: str,
+        *,
+        base_model: BaseModel | None = None,
+        source: ConfigInput = None,
+        overrides: ConfigInput = None,
+    ) -> BaseModel | None:
+        """Resolve a standalone component model without materialising BacktesterConfig."""
+        normalized = self._normalize_component_name(component)
+        model_cls = self._COMPONENT_MODELS.get(normalized)
+        if model_cls is None:
+            raise ConfigSourceError(f"Unknown component: {component}")
+
+        payload: dict[str, Any] | None = None
+        if base_model is not None:
+            payload = base_model.model_dump(mode="python")
+        else:
+            defaults = getattr(self._defaults, normalized, None)
+            if isinstance(defaults, BaseModel):
+                payload = defaults.model_dump(mode="python")
+
+        if source is not None:
+            source_payload = self.load_component_payload(normalized, source)
+            if source_payload is not None:
+                payload = self._deep_merge(payload or {}, source_payload)
+
+        if overrides is not None:
+            override_payload = self.load_component_payload(normalized, overrides)
+            if override_payload is not None:
+                payload = self._deep_merge(payload or {}, override_payload)
+
+        if payload is None:
+            return None
+
+        try:
+            return model_cls(**payload)
+        except ValidationError as exc:
+            raise ConfigValidationError(
+                f"Unable to resolve component '{normalized}'",
+                component=normalized,
+                errors=exc.errors(),
+            ) from exc
+
     def load_yaml(self, path: str | Path) -> Mapping[str, Any]:
         """Read a YAML file and return its mapping payload."""
         resolved_path = Path(path).expanduser()
@@ -183,6 +227,15 @@ class ConfigProcessor:
             return validate_run_config(config)
         except ValueError as exc:
             raise ConfigValidationError(str(exc), source="validation") from exc
+
+    def load_component_payload(
+        self,
+        component: str,
+        source: ConfigInput,
+    ) -> dict[str, Any] | None:
+        """Return a mutable mapping for a component source without instantiating a model."""
+        normalized = self._normalize_component_name(component)
+        return self._coerce_component_payload(normalized, source)
 
     def diff_with_defaults(self, config: BacktesterConfig | None = None) -> list[ConfigDelta]:
         """Compare a resolved config with the processor defaults."""

@@ -31,17 +31,14 @@ class OBVIndicator(BaseIndicator):
     OBV is used to detect divergences between volume and price action.
     """
 
-    def __init__(self, config: IndicatorConfig) -> None:
-        """Initialize OBV indicator.
-
-        Args:
-            config: OBV configuration parameters
-        """
-        super().__init__(config)
-
-        # Override config values to ensure OBV-specific defaults
-        if self.type != "volume":
-            self.config.indicator_type = "volume"
+    @classmethod
+    def default_config(cls) -> IndicatorConfig:
+        """Return the default OBV configuration."""
+        return IndicatorConfig(
+            indicator_name="obv",
+            factory_name="obv",
+            indicator_type="volume",
+        )
 
     def calculate(self, data: pd.DataFrame) -> pd.DataFrame:
         """Calculate On-Balance Volume (OBV) values.

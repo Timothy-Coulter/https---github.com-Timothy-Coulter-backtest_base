@@ -29,17 +29,17 @@ class BollingerBandsIndicator(BaseIndicator):
     market volatility.
     """
 
-    def __init__(self, config: IndicatorConfig) -> None:
-        """Initialize Bollinger Bands indicator.
-
-        Args:
-            config: Bollinger Bands configuration parameters
-        """
-        super().__init__(config)
-
-        # Override config values to ensure Bollinger Bands-specific defaults
-        if self.type != "volatility":
-            self.config.indicator_type = "volatility"
+    @classmethod
+    def default_config(cls) -> IndicatorConfig:
+        """Return the canonical Bollinger Bands configuration."""
+        return IndicatorConfig(
+            indicator_name="bollinger_bands",
+            factory_name="bollinger_bands",
+            indicator_type="volatility",
+            period=20,
+            standard_deviations=2.0,
+            ma_type="simple",
+        )
 
     def calculate(self, data: pd.DataFrame) -> pd.DataFrame:
         """Calculate Bollinger Bands values (upper, middle, lower bands).

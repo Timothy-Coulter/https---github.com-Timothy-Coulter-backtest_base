@@ -24,17 +24,17 @@ class RSIIndicator(BaseIndicator):
     readings below 30 considered oversold.
     """
 
-    def __init__(self, config: IndicatorConfig) -> None:
-        """Initialize RSI indicator.
-
-        Args:
-            config: RSI configuration parameters
-        """
-        super().__init__(config)
-
-        # Override config values to ensure RSI-specific defaults
-        if self.type != "momentum":
-            self.config.indicator_type = "momentum"
+    @classmethod
+    def default_config(cls) -> IndicatorConfig:
+        """Return the canonical RSI configuration."""
+        return IndicatorConfig(
+            indicator_name="rsi",
+            factory_name="rsi",
+            indicator_type="momentum",
+            period=14,
+            overbought_threshold=70.0,
+            oversold_threshold=30.0,
+        )
 
     def calculate(self, data: pd.DataFrame) -> pd.DataFrame:
         """Calculate RSI values.

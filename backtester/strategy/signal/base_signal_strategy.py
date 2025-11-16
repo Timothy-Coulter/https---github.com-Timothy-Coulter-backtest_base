@@ -16,7 +16,7 @@ from backtester.core.event_bus import EventBus, EventFilter
 from backtester.core.events import MarketDataEvent, create_signal_event
 from backtester.core.logger import get_backtester_logger
 from backtester.indicators.base_indicator import BaseIndicator, IndicatorFactory
-from backtester.indicators.indicator_configs import IndicatorConfig
+from backtester.indicators.config_loader import IndicatorConfigResolver
 from backtester.model.base_model import BaseModel
 from backtester.model.model_configs import ModelConfig
 from backtester.signal.signal_types import SignalGenerator
@@ -119,34 +119,23 @@ class BaseSignalStrategy(ABC):
 
     def _initialize_components(self) -> None:
         """Initialize indicators and models based on configuration."""
-        # Initialize indicators
-        for indicator_config in self.config.indicators:
+        resolver = IndicatorConfigResolver()
+        for indicator_definition in self.config.indicators:
             try:
-                # Handle both dict and IndicatorConfig objects
-                if hasattr(indicator_config, 'indicator_name'):
-                    # It's already an IndicatorConfig object
-                    indicator_name = indicator_config.indicator_name
-                    config = indicator_config
-                else:
-                    # It's a dict, convert to IndicatorConfig
-                    indicator_name = indicator_config.get('indicator_name')
-                    if not indicator_name:
-                        self.logger.warning("Skipping indicator with no name")
-                        continue
-                    config = IndicatorConfig(**indicator_config)
-
-                # Convert indicator name to lowercase to match factory registration
-                indicator_name_lower = indicator_name.lower()
-                indicator = IndicatorFactory.create(indicator_name_lower, config)
+                config = resolver.resolve(indicator_definition)
+                indicator_name = config.indicator_name
+                factory_name = (config.factory_name or indicator_name).lower()
+                indicator = IndicatorFactory.create(factory_name, config)
                 self.indicators[indicator_name] = indicator
                 self.logger.debug(
-                    f"Initialized indicator: {indicator_name} (factory name: {indicator_name_lower})"
+                    "Initialized indicator: %s (factory name: %s)",
+                    indicator_name,
+                    factory_name,
                 )
 
             except Exception as e:
-                self.logger.error(
-                    f"Failed to initialize indicator {getattr(indicator_config, 'indicator_name', 'unknown')}: {e}"
-                )
+                fallback_name = getattr(indicator_definition, 'indicator_name', 'unknown')
+                self.logger.error(f"Failed to initialize indicator {fallback_name}: {e}")
 
         # Initialize models (only if models attribute exists in config)
         if hasattr(self.config, 'models'):

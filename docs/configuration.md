@@ -50,11 +50,12 @@ To preserve separation of concerns, components receive only the relevant slice o
 Downstream components no longer receive the mutable `BacktesterConfig` object. Instead, helper
 functions in `backtester.core.config` build frozen dataclasses:
 
-- `build_data_config_view`, `build_portfolio_config_view`, `build_execution_config_view`,
-  and `build_risk_config_view` yield immutable snapshots that mirror the active run.
-- `GeneralPortfolio`, `SimulatedBroker`, `RiskControlManager`, and the strategy orchestrator
-  only consume these views, so attempts to mutate configuration at runtime now raise
-  `dataclasses.FrozenInstanceError`.
+- `build_data_config_view`, `build_portfolio_config_view`, and `build_risk_config_view` yield
+  immutable snapshots that mirror the active run.
+- `GeneralPortfolio`, `RiskControlManager`, and the strategy orchestrator only consume these
+  views, so attempts to mutate configuration at runtime now raise `dataclasses.FrozenInstanceError`.
+- Execution components receive the typed `SimulatedBrokerConfig` directly, allowing richer
+  validation (throttling, latency controls, etc.) without the extra view layer.
 
 This guarantees that once a backtest starts, every component sees the exact same inputs that were
 logged via the configuration diff helper.

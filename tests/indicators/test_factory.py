@@ -160,6 +160,18 @@ class TestIndicatorFactory:
         with pytest.raises(ValueError, match="Unknown indicator: unknown_indicator"):
             IndicatorFactory.create("unknown_indicator", config)
 
+    def test_create_with_default_config(self) -> None:
+        """Factory should fall back to default configurations when none provided."""
+        indicator = IndicatorFactory.create("rsi")
+        assert isinstance(indicator, RSIIndicator)
+        assert indicator.config.indicator_name == 'rsi'
+
+    def test_default_config_lookup(self) -> None:
+        """default_config helper should instantiate registered configs."""
+        config = IndicatorFactory.default_config("sma")
+        assert config.factory_name == 'sma'
+        assert config.indicator_type == 'trend'
+
     def test_is_registered(self) -> None:
         """Test checking if indicator is registered."""
         # Test registered indicators

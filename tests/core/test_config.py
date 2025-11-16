@@ -8,7 +8,6 @@ from backtester.core.config import (
     BacktesterConfig,
     BacktestRunConfig,
     DataRetrievalConfig,
-    build_execution_config_view,
     build_portfolio_config_view,
     build_risk_config_view,
     validate_run_config,
@@ -62,14 +61,6 @@ def test_portfolio_config_view_is_frozen() -> None:
     view = build_portfolio_config_view(config)
     with pytest.raises(FrozenInstanceError):
         view.initial_capital = 0.0  # type: ignore[misc]
-
-
-def test_execution_config_view_is_frozen() -> None:
-    """Execution config view should be immutable."""
-    config = BacktesterConfig()
-    view = build_execution_config_view(config)
-    with pytest.raises(FrozenInstanceError):
-        view.commission_rate = 0.01  # type: ignore[misc]
 
 
 def test_risk_config_view_materialize_returns_copy() -> None:

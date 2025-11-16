@@ -5,13 +5,22 @@ commission calculations, and trade reporting.
 """
 
 import logging
+import random
 import time
+from collections import deque
+from collections.abc import Mapping
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pandas as pd
+from pydantic import ValidationError
 
-from backtester.core.config import ExecutionConfig, ExecutionConfigView, SimulatedBrokerConfig
+from backtester.core.config import ExecutionConfig, SimulatedBrokerConfig
+from backtester.core.config_processor import (
+    ConfigProcessor,
+    ConfigValidationError,
+)
 from backtester.core.event_bus import EventBus, EventPriority
 from backtester.core.events import OrderEvent as BusOrderEvent
 from backtester.core.events import OrderSide as EventOrderSide
@@ -24,10 +33,16 @@ from backtester.execution.order import Order, OrderManager, OrderSide, OrderType
 class SimulatedBroker:
     """Simulated broker for order execution and trade reporting."""
 
+    _VALID_SLIPPAGE_MODELS = {'normal', 'fixed', 'none'}
+
     def __init__(
         self,
-        config: ExecutionConfig | SimulatedBrokerConfig | None = None,
-        config_view: ExecutionConfigView | None = None,
+        config: (
+            SimulatedBrokerConfig | ExecutionConfig | Mapping[str, Any] | str | bytes | Path | None
+        ) = None,
+        *,
+        config_overrides: Mapping[str, Any] | None = None,
+        config_processor: ConfigProcessor | None = None,
         commission_rate: float | None = None,
         min_commission: float | None = None,
         spread: float | None = None,
@@ -42,8 +57,9 @@ class SimulatedBroker:
         """Initialize the simulated broker.
 
         Args:
-            config: Execution configuration model applied to the broker.
-            config_view: Immutable execution configuration snapshot (deprecated).
+            config: Execution configuration model, mapping, or YAML path.
+            config_overrides: Mapping of overrides merged on top of ``config``.
+            config_processor: Optional shared ConfigProcessor instance.
             commission_rate: Commission rate override for backward compatibility.
             min_commission: Minimum commission override for backward compatibility.
             spread: Bid-ask spread override for backward compatibility.
@@ -59,68 +75,174 @@ class SimulatedBroker:
         self.event_bus = event_bus
         self.risk_manager = risk_manager
 
-        resolved_config = self._resolve_config(config=config, config_view=config_view)
-        params = resolved_config.model_dump()
-        if commission_rate is not None:
-            params['commission_rate'] = commission_rate
-        if min_commission is not None:
-            params['min_commission'] = min_commission
-        if spread is not None:
-            params['spread'] = spread
-        if slippage_model is not None:
-            params['slippage_model'] = slippage_model
-        if slippage_std is not None:
-            params['slippage_std'] = slippage_std
-        if latency_ms is not None:
-            params['latency_ms'] = latency_ms
+        self._config_processor = config_processor or ConfigProcessor()
+        merged_overrides = self._collect_config_overrides(
+            config_overrides=config_overrides,
+            commission_rate=commission_rate,
+            min_commission=min_commission,
+            spread=spread,
+            slippage_model=slippage_model,
+            slippage_std=slippage_std,
+            latency_ms=latency_ms,
+        )
+        resolved_config = self._resolve_config(config=config, overrides=merged_overrides)
 
-        self._config = ExecutionConfig(**params)
-        self._config_view = config_view
+        self._config = resolved_config
 
-        self.commission_rate = self._config.commission_rate
-        self.min_commission = self._config.min_commission
-        self.spread = self._config.spread
-        self.slippage_model = self._config.slippage_model
-        self.slippage_std = self._config.slippage_std
-        self.latency_ms = self._config.latency_ms
+        self.commission_rate = resolved_config.commission_rate
+        self.min_commission = resolved_config.min_commission
+        self.spread = resolved_config.spread
+        self.slippage_model = resolved_config.slippage_model
+        self.slippage_distribution = resolved_config.slippage_distribution
+        self.slippage_std = resolved_config.slippage_std
+        self.latency_ms = resolved_config.latency_ms
+        self.latency_jitter_ms = resolved_config.latency_jitter_ms
+        self.max_orders_per_minute = resolved_config.max_orders_per_minute
+        self.order_cooldown_seconds = resolved_config.order_cooldown_seconds
 
         # State
-        self.order_manager = OrderManager(logger)
+        self.order_manager = OrderManager(logger, config=resolved_config)
         self.market_data: dict[str, pd.DataFrame] = {}
         self.current_prices: dict[str, float] = {}
         self.trade_history: list[dict[str, Any]] = []
         self.cash_balance: float = initial_cash or 0.0
         self.positions: dict[str, float] = {}
         self.portfolio_value: float = self.cash_balance
+        self._order_timestamps: deque[float] = deque()
+        self._last_order_timestamp: float | None = None
 
         self.logger.info("Simulated broker initialized")
 
     @classmethod
-    def default_config(cls) -> ExecutionConfig:
+    def default_config(cls) -> SimulatedBrokerConfig:
         """Return the default execution configuration for the broker."""
-        return ExecutionConfig()
+        return SimulatedBrokerConfig()
 
     @staticmethod
-    def _resolve_config(
+    def _collect_config_overrides(
         *,
-        config: ExecutionConfig | SimulatedBrokerConfig | None,
-        config_view: ExecutionConfigView | None,
-    ) -> ExecutionConfig:
+        config_overrides: Mapping[str, Any] | None,
+        commission_rate: float | None,
+        min_commission: float | None,
+        spread: float | None,
+        slippage_model: str | None,
+        slippage_std: float | None,
+        latency_ms: float | None,
+    ) -> dict[str, Any]:
+        """Merge legacy kwargs with explicit overrides into a single mapping."""
+        overrides: dict[str, Any] = dict(config_overrides or {})
+        legacy = {
+            'commission_rate': commission_rate,
+            'min_commission': min_commission,
+            'spread': spread,
+            'slippage_model': slippage_model,
+            'slippage_std': slippage_std,
+            'latency_ms': latency_ms,
+        }
+        for key, value in legacy.items():
+            if value is not None:
+                overrides[key] = value
+        return overrides
+
+    def _resolve_config(
+        self,
+        *,
+        config: (
+            SimulatedBrokerConfig | ExecutionConfig | Mapping[str, Any] | str | bytes | Path | None
+        ),
+        overrides: Mapping[str, Any] | None,
+    ) -> SimulatedBrokerConfig:
         """Resolve the configuration precedence for the broker."""
-        if config_view is not None:
-            return ExecutionConfig(
-                commission_rate=config_view.commission_rate,
-                min_commission=config_view.min_commission,
-                spread=config_view.spread,
-                slippage_model=config_view.slippage_model,
-                slippage_std=config_view.slippage_std,
-                latency_ms=config_view.latency_ms,
-            )
-        if isinstance(config, ExecutionConfig):
-            return config.model_copy(deep=True)
-        if isinstance(config, SimulatedBrokerConfig):
-            return ExecutionConfig(**config.model_dump(mode="python"))
-        return SimulatedBroker.default_config()
+        payload, distribution_explicit = self._collect_execution_payload(
+            config=config,
+            overrides=overrides,
+        )
+
+        model_value = payload.get('slippage_model')
+        if model_value not in self._VALID_SLIPPAGE_MODELS:
+            payload['slippage_model'] = 'none'
+            model_value = 'none'
+
+        if not distribution_explicit:
+            payload['slippage_distribution'] = model_value
+
+        try:
+            return SimulatedBrokerConfig(**payload)
+        except ValidationError as exc:
+            raise ConfigValidationError(
+                "Unable to resolve execution configuration",
+                component='execution',
+                errors=exc.errors(),
+            ) from exc
+
+    def _collect_execution_payload(
+        self,
+        *,
+        config: (
+            SimulatedBrokerConfig | ExecutionConfig | Mapping[str, Any] | str | bytes | Path | None
+        ),
+        overrides: Mapping[str, Any] | None,
+    ) -> tuple[dict[str, Any], bool]:
+        """Merge config sources and note whether distribution overrides were supplied."""
+        payload = self.default_config().model_dump(mode="python")
+        distribution_explicit = False
+
+        if isinstance(config, (SimulatedBrokerConfig, ExecutionConfig)):
+            if getattr(config, 'slippage_distribution', None) is not None:
+                distribution_explicit = True
+            payload = ConfigProcessor._deep_merge(payload, config.model_dump(mode="python"))
+        elif config is not None:
+            component_payload = self._config_processor.load_component_payload('execution', config)
+            if component_payload is not None:
+                if 'slippage_distribution' in component_payload:
+                    distribution_explicit = True
+                payload = ConfigProcessor._deep_merge(payload, component_payload)
+
+        if overrides:
+            overrides_dict = dict(overrides)
+            payload = ConfigProcessor._deep_merge(payload, overrides_dict)
+            if 'slippage_distribution' in overrides_dict:
+                distribution_explicit = True
+
+        return payload, distribution_explicit
+
+    def _simulate_latency(self) -> None:
+        """Apply simulated latency with optional jitter without blocking excessively."""
+        total_ms = self.latency_ms + random.uniform(0, self.latency_jitter_ms)
+        if total_ms <= 0:
+            return
+        time.sleep(min(total_ms / 1000.0, 0.05))
+
+    def _respect_throttles(self, order: Order) -> bool:
+        """Enforce cooldown and per-minute order throttles."""
+        now = time.time()
+
+        if self.order_cooldown_seconds > 0 and self._last_order_timestamp is not None:
+            elapsed = now - self._last_order_timestamp
+            if elapsed < self.order_cooldown_seconds:
+                order.reject("Order cooldown in effect")
+                self._publish_order_event(
+                    order,
+                    EventOrderStatus.REJECTED,
+                    message="Order cooldown in effect",
+                )
+                return False
+
+        if self.max_orders_per_minute > 0:
+            while self._order_timestamps and now - self._order_timestamps[0] > 60:
+                self._order_timestamps.popleft()
+            if len(self._order_timestamps) >= self.max_orders_per_minute:
+                order.reject("Order rate limit exceeded")
+                self._publish_order_event(
+                    order,
+                    EventOrderStatus.REJECTED,
+                    message="Order rate limit exceeded",
+                )
+                return False
+            self._order_timestamps.append(now)
+
+        self._last_order_timestamp = now
+        return True
 
     # ------------------------------------------------------------------#
     # Lifecycle hooks
@@ -229,10 +351,10 @@ class SimulatedBroker:
         if not order.is_active:
             return False
 
-        # Simulate latency
-        if self.latency_ms > 0:
-            # In a real implementation, this would involve async operations
-            pass
+        if not self._respect_throttles(order):
+            return False
+
+        self._simulate_latency()
 
         # Get current market data
         current_price = self.get_current_price(order.symbol)
@@ -464,12 +586,16 @@ class SimulatedBroker:
         Returns:
             Slippage amount
         """
-        if self.slippage_model == "none":
+        distribution = (self.slippage_distribution or self.slippage_model or "none").lower()
+        if distribution == "none":
             return 0.0
-        elif self.slippage_model == "fixed":
+        if distribution == "fixed":
             return reference_price * self.slippage_std
-        elif self.slippage_model == "normal":
+        if distribution == "normal":
             slippage = np.random.normal(0, self.slippage_std)
+            return reference_price * slippage
+        if distribution == "lognormal":
+            slippage = np.random.lognormal(mean=0.0, sigma=self.slippage_std) - 1.0
             return reference_price * slippage
 
         return 0.0

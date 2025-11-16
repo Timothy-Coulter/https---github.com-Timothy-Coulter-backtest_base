@@ -26,17 +26,17 @@ class MACDIndicator(BaseIndicator):
     buy and sell signals.
     """
 
-    def __init__(self, config: IndicatorConfig) -> None:
-        """Initialize MACD indicator.
-
-        Args:
-            config: MACD configuration parameters
-        """
-        super().__init__(config)
-
-        # Override config values to ensure MACD-specific defaults
-        if self.type != "momentum":
-            self.config.indicator_type = "momentum"
+    @classmethod
+    def default_config(cls) -> IndicatorConfig:
+        """Return the standard MACD configuration."""
+        return IndicatorConfig(
+            indicator_name="macd",
+            factory_name="macd",
+            indicator_type="momentum",
+            fast_period=12,
+            slow_period=26,
+            signal_period=9,
+        )
 
     def calculate(self, data: pd.DataFrame) -> pd.DataFrame:
         """Calculate MACD values (MACD line, signal line, and histogram).

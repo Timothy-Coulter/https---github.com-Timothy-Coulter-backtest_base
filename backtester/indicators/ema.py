@@ -24,20 +24,16 @@ class EMAIndicator(BaseIndicator):
     short-term price movements and trend changes.
     """
 
-    def __init__(self, config: IndicatorConfig) -> None:
-        """Initialize EMA indicator.
-
-        Args:
-            config: EMA configuration parameters
-        """
-        super().__init__(config)
-
-        # Override config values to ensure EMA-specific defaults
-        if self.type != "trend":
-            self.config.indicator_type = "trend"
-            self.type = "trend"  # Also update the instance variable
-        if self.config.ma_type != "exponential":
-            self.config.ma_type = "exponential"
+    @classmethod
+    def default_config(cls) -> IndicatorConfig:
+        """Return the canonical EMA configuration."""
+        return IndicatorConfig(
+            indicator_name="ema",
+            factory_name="ema",
+            indicator_type="trend",
+            period=12,
+            ma_type="exponential",
+        )
 
     def calculate(self, data: pd.DataFrame) -> pd.DataFrame:
         """Calculate Exponential Moving Average values.

@@ -6,6 +6,7 @@ commission calculation, position management, and configuration usage.
 """
 
 import logging
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pandas as pd
@@ -28,6 +29,10 @@ class TestSimulatedBrokerConfig:
         assert config.slippage_model == "normal"
         assert config.slippage_std == 0.0005
         assert config.latency_ms == 0.0
+        assert config.latency_jitter_ms == 0.0
+        assert config.max_orders_per_minute == 0
+        assert config.order_cooldown_seconds == 0.0
+        assert config.slippage_distribution == "normal"
 
     def test_custom_config_creation(self) -> None:
         """Test creating config with custom values."""
@@ -36,15 +41,23 @@ class TestSimulatedBrokerConfig:
             min_commission=2.0,
             spread=0.0002,
             slippage_model="fixed",
+            slippage_distribution="lognormal",
             slippage_std=0.001,
             latency_ms=5.0,
+            latency_jitter_ms=1.5,
+            max_orders_per_minute=25,
+            order_cooldown_seconds=0.5,
         )
         assert config.commission_rate == 0.002
         assert config.min_commission == 2.0
         assert config.spread == 0.0002
         assert config.slippage_model == "fixed"
+        assert config.slippage_distribution == "lognormal"
         assert config.slippage_std == 0.001
         assert config.latency_ms == 5.0
+        assert config.latency_jitter_ms == 1.5
+        assert config.max_orders_per_minute == 25
+        assert config.order_cooldown_seconds == 0.5
 
     def test_slippage_model_validation_valid(self) -> None:
         """Test slippage model validation with valid values."""
@@ -72,6 +85,29 @@ class TestSimulatedBrokerConfig:
         assert isinstance(config_dict, dict)
         assert config_dict["commission_rate"] == 0.002
         assert config_dict["min_commission"] == 2.0
+
+    def test_default_config_factory(self) -> None:
+        """SimulatedBroker.default_config should return a config instance."""
+        config = SimulatedBroker.default_config()
+        assert isinstance(config, SimulatedBrokerConfig)
+
+    def test_init_with_yaml_config(self) -> None:
+        """Broker should load configuration from YAML files."""
+        config_path = (
+            Path(__file__).resolve().parents[2] / "component_configs" / "execution" / "retail.yaml"
+        )
+        broker = SimulatedBroker(config=config_path)
+        assert pytest.approx(broker.commission_rate, rel=1e-6) == 0.001
+        assert broker.max_orders_per_minute == 120
+
+    def test_config_overrides_are_applied(self) -> None:
+        """Config overrides must win over base config values."""
+        broker = SimulatedBroker(
+            config={'commission_rate': 0.002},
+            config_overrides={'latency_ms': 12.5},
+        )
+        assert broker.commission_rate == 0.002
+        assert broker.latency_ms == 12.5
 
 
 class TestSimulatedBrokerInitialization:
@@ -303,6 +339,32 @@ class TestOrderExecution:
         assert result is False
         assert order.status == OrderStatus.REJECTED
 
+    def test_order_rate_limit_rejects_excess_orders(self, market_data: pd.DataFrame) -> None:
+        """Rate limiting should reject the second order within the same minute."""
+        broker = SimulatedBroker(config_overrides={'max_orders_per_minute': 1})
+        broker.set_market_data("TEST", market_data)
+        broker.cash_balance = 20000.0
+
+        first = Order(symbol="TEST", side=OrderSide.BUY, order_type=OrderType.MARKET, quantity=10.0)
+        second = Order(symbol="TEST", side=OrderSide.BUY, order_type=OrderType.MARKET, quantity=5.0)
+
+        assert broker.execute_order(first) is True
+        assert broker.execute_order(second) is False
+        assert second.status == OrderStatus.REJECTED
+
+    def test_order_cooldown_blocks_back_to_back_orders(self, market_data: pd.DataFrame) -> None:
+        """Cooldown enforcement should reject orders submitted too quickly."""
+        broker = SimulatedBroker(config_overrides={'order_cooldown_seconds': 5.0})
+        broker.set_market_data("TEST", market_data)
+        broker.cash_balance = 20000.0
+
+        first = Order(symbol="TEST", side=OrderSide.BUY, order_type=OrderType.MARKET, quantity=10.0)
+        second = Order(symbol="TEST", side=OrderSide.BUY, order_type=OrderType.MARKET, quantity=5.0)
+
+        assert broker.execute_order(first) is True
+        assert broker.execute_order(second) is False
+        assert second.status == OrderStatus.REJECTED
+
     def test_execute_limit_order_favorable(
         self, broker: SimulatedBroker, market_data: pd.DataFrame
     ) -> None:
@@ -509,6 +571,18 @@ class TestSlippageModels:
 
         slippage = broker._calculate_slippage(order, 100.0)
         assert slippage == 0.0  # Should default to no slippage
+
+    def test_slippage_lognormal_distribution(self) -> None:
+        """Lognormal slippage distribution should rely on numpy's lognormal sampler."""
+        broker = SimulatedBroker(
+            config_overrides={'slippage_distribution': 'lognormal'}, slippage_std=0.1
+        )
+        order = Order(symbol="TEST", side=OrderSide.BUY, order_type=OrderType.MARKET, quantity=10.0)
+
+        with patch('numpy.random.lognormal') as mock_lognormal:
+            mock_lognormal.return_value = 1.01
+            slippage = broker._calculate_slippage(order, 100.0)
+            assert slippage == pytest.approx(1.0, rel=1e-9)
 
 
 class TestAccountOperations:

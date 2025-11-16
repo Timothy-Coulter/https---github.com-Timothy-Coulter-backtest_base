@@ -48,6 +48,11 @@ class BaseIndicator(ABC):
 
         self.logger.debug(f"Initialized indicator: {self.name} (type: {self.type})")
 
+    @classmethod
+    def default_config(cls) -> IndicatorConfig:
+        """Return the default configuration for the indicator implementation."""
+        raise NotImplementedError(f"{cls.__name__} must define default_config()")
+
     @abstractmethod
     def calculate(self, data: pd.DataFrame) -> pd.DataFrame:
         """Calculate indicator values.
@@ -249,18 +254,34 @@ class IndicatorFactory:
         """
 
         def decorator(indicator_class: type[BaseIndicator]) -> type[BaseIndicator]:
-            cls._indicators[name] = indicator_class
+            cls._indicators[name.lower()] = indicator_class
             return indicator_class
 
         return decorator
 
     @classmethod
-    def create(cls, name: str, config: IndicatorConfig) -> BaseIndicator:
+    def _get_indicator_class(cls, name: str) -> type[BaseIndicator]:
+        slug = name.lower()
+        indicator_class = cls._indicators.get(slug)
+        if indicator_class is None:
+            available = list(cls._indicators.keys())
+            raise ValueError(f"Unknown indicator: {slug}. Available indicators: {available}")
+        return indicator_class
+
+    @classmethod
+    def default_config(cls, name: str) -> IndicatorConfig:
+        """Return the registered indicator's default configuration."""
+        indicator_class = cls._get_indicator_class(name)
+        return indicator_class.default_config()
+
+    @classmethod
+    def create(cls, name: str, config: IndicatorConfig | None = None) -> BaseIndicator:
         """Create an indicator instance by name.
 
         Args:
             name: Name of the indicator to create
-            config: Configuration for the indicator
+            config: Configuration for the indicator. When omitted the registered
+                indicator default will be used.
 
         Returns:
             Indicator instance
@@ -268,12 +289,11 @@ class IndicatorFactory:
         Raises:
             ValueError: If the indicator name is not registered
         """
-        if name not in cls._indicators:
-            available = list(cls._indicators.keys())
-            raise ValueError(f"Unknown indicator: {name}. Available indicators: {available}")
-
-        indicator_class = cls._indicators[name]
-        return indicator_class(config)
+        indicator_class = cls._get_indicator_class(name)
+        resolved_config = config or indicator_class.default_config()
+        if resolved_config.factory_name is None:
+            resolved_config.factory_name = name.lower()
+        return indicator_class(resolved_config)
 
     @classmethod
     def get_available_indicators(cls) -> list[str]:
@@ -294,4 +314,4 @@ class IndicatorFactory:
         Returns:
             True if the indicator is registered
         """
-        return name in cls._indicators
+        return name.lower() in cls._indicators

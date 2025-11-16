@@ -23,20 +23,16 @@ class SMAIndicator(BaseIndicator):
     trend direction and potential support/resistance levels.
     """
 
-    def __init__(self, config: IndicatorConfig) -> None:
-        """Initialize SMA indicator.
-
-        Args:
-            config: SMA configuration parameters
-        """
-        super().__init__(config)
-
-        # Override config values to ensure SMA-specific defaults
-        if self.type != "trend":
-            self.config.indicator_type = "trend"
-            self.type = "trend"  # Also update the instance variable
-        if self.config.ma_type != "simple":
-            self.config.ma_type = "simple"
+    @classmethod
+    def default_config(cls) -> IndicatorConfig:
+        """Return the reference SMA configuration."""
+        return IndicatorConfig(
+            indicator_name="sma",
+            factory_name="sma",
+            indicator_type="trend",
+            period=20,
+            ma_type="simple",
+        )
 
     def calculate(self, data: pd.DataFrame) -> pd.DataFrame:
         """Calculate Simple Moving Average values.

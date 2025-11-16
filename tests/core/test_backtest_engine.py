@@ -206,6 +206,7 @@ class TestBacktestEngine:
         portfolio_config = getattr(engine.current_portfolio, "_config", None)
         assert portfolio_config is not None
         baseline_capital = engine.current_portfolio.initial_capital
+        assert engine.config.portfolio is not None
         engine.config.portfolio.initial_capital = baseline_capital + 500.0
         assert engine.current_portfolio.initial_capital == baseline_capital
 

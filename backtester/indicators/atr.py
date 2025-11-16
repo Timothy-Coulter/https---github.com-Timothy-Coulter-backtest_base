@@ -29,17 +29,15 @@ class ATRIndicator(BaseIndicator):
     sizing and stop-loss levels.
     """
 
-    def __init__(self, config: IndicatorConfig) -> None:
-        """Initialize ATR indicator.
-
-        Args:
-            config: ATR configuration parameters
-        """
-        super().__init__(config)
-
-        # Override config values to ensure ATR-specific defaults
-        if self.type != "volatility":
-            self.config.indicator_type = "volatility"
+    @classmethod
+    def default_config(cls) -> IndicatorConfig:
+        """Return the reference configuration for the ATR indicator."""
+        return IndicatorConfig(
+            indicator_name="atr",
+            factory_name="atr",
+            indicator_type="volatility",
+            period=14,
+        )
 
     def calculate(self, data: pd.DataFrame) -> pd.DataFrame:
         """Calculate Average True Range (ATR) values.

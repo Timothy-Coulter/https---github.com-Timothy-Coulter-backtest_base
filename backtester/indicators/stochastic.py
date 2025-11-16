@@ -25,17 +25,16 @@ class StochasticOscillator(BaseIndicator):
     line, while %D is a moving average of %K.
     """
 
-    def __init__(self, config: IndicatorConfig) -> None:
-        """Initialize Stochastic Oscillator indicator.
-
-        Args:
-            config: Stochastic configuration parameters
-        """
-        super().__init__(config)
-
-        # Override config values to ensure Stochastic-specific defaults
-        if self.type != "momentum":
-            self.config.indicator_type = "momentum"
+    @classmethod
+    def default_config(cls) -> IndicatorConfig:
+        """Return the baseline Stochastic Oscillator configuration."""
+        return IndicatorConfig(
+            indicator_name="stochastic",
+            factory_name="stochastic",
+            indicator_type="momentum",
+            k_period=14,
+            d_period=3,
+        )
 
     def calculate(self, data: pd.DataFrame) -> pd.DataFrame:
         """Calculate Stochastic Oscillator values (%K and %D).

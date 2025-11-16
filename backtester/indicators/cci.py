@@ -30,17 +30,16 @@ class CCIIndicator(BaseIndicator):
     - Mean Deviation = Mean of absolute differences from SMA
     """
 
-    def __init__(self, config: IndicatorConfig) -> None:
-        """Initialize CCI indicator.
-
-        Args:
-            config: CCI configuration parameters
-        """
-        super().__init__(config)
-
-        # Override config values to ensure CCI-specific defaults
-        if self.type != "momentum":
-            self.config.indicator_type = "momentum"
+    @classmethod
+    def default_config(cls) -> IndicatorConfig:
+        """Return the baseline configuration for the CCI indicator."""
+        return IndicatorConfig(
+            indicator_name="cci",
+            factory_name="cci",
+            indicator_type="momentum",
+            cci_period=20,
+            cci_constant=0.015,
+        )
 
     def calculate(self, data: pd.DataFrame) -> pd.DataFrame:
         """Calculate Commodity Channel Index (CCI) values.

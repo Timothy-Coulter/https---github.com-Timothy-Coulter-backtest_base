@@ -6,7 +6,23 @@ following the established pydantic patterns from the core configuration system.
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+_INDICATOR_TYPE_HINTS: dict[str, str] = {
+    'sma': 'trend',
+    'ema': 'trend',
+    'wma': 'trend',
+    'rsi': 'momentum',
+    'macd': 'momentum',
+    'stochastic': 'momentum',
+    'williamsr': 'momentum',
+    'williams_r': 'momentum',
+    'cci': 'momentum',
+    'obv': 'volume',
+    'bollinger': 'volatility',
+    'bollinger_bands': 'volatility',
+    'atr': 'volatility',
+}
 
 
 class IndicatorConfig(BaseModel):
@@ -19,11 +35,27 @@ class IndicatorConfig(BaseModel):
     model_config = ConfigDict(
         use_enum_values=True,
         arbitrary_types_allowed=True,
+        json_schema_extra={
+            'component': 'indicator',
+            'yaml_example': {
+                '__config_class__': 'IndicatorConfig',
+                'indicator_name': 'rsi',
+                'factory_name': 'rsi',
+                'indicator_type': 'momentum',
+                'period': 14,
+                'overbought_threshold': 70,
+                'oversold_threshold': 30,
+            },
+        },
     )
 
     # Core indicator settings
     indicator_name: str = Field(description="Name of the indicator")
-    indicator_type: str = Field(description="Type/category of indicator")
+    indicator_type: str = Field(default="trend", description="Type/category of indicator")
+    factory_name: str | None = Field(
+        default=None,
+        description="Optional IndicatorFactory registration name",
+    )
     period: int = Field(default=14, description="Lookback period for calculations")
 
     # Moving Average Indicators
@@ -131,6 +163,32 @@ class IndicatorConfig(BaseModel):
         ) and not 0.0 <= v <= 1.0:
             raise ValueError(f"Value {v} must be between 0.0 and 1.0")
         return v
+
+    @model_validator(mode='after')
+    def _normalise_indicator(self) -> 'IndicatorConfig':
+        """Normalise common indicator metadata for downstream loaders."""
+        normalized_name = self.indicator_name.strip()
+        self.indicator_name = normalized_name
+        normalized_lower = normalized_name.lower()
+
+        for key, hint in _INDICATOR_TYPE_HINTS.items():
+            if (
+                normalized_lower == key
+                or normalized_lower.startswith(f"{key}_")
+                or key in normalized_lower
+            ):
+                self.indicator_type = hint
+                break
+
+        if self.factory_name is None and normalized_name:
+            self.factory_name = normalized_lower
+
+        if normalized_lower.startswith('ema'):
+            self.ma_type = 'exponential'
+        elif normalized_lower.startswith('sma'):
+            self.ma_type = 'simple'
+
+        return self
 
     def get_indicator_columns(self) -> list[str]:
         """Get list of columns that this indicator will add to the DataFrame.

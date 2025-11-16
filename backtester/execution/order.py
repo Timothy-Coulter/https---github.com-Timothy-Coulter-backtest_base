@@ -12,6 +12,8 @@ from typing import Any
 
 import pandas as pd
 
+from backtester.core.config import SimulatedBrokerConfig
+
 
 class OrderType(Enum):
     """Order type enumeration."""
@@ -162,16 +164,23 @@ class Order:
 class OrderManager:
     """Order management system."""
 
-    def __init__(self, logger: logging.Logger | None = None) -> None:
+    def __init__(
+        self,
+        logger: logging.Logger | None = None,
+        *,
+        config: SimulatedBrokerConfig | None = None,
+    ) -> None:
         """Initialize the order manager.
 
         Args:
             logger: Optional logger instance
+            config: Optional broker configuration so metadata mirrors execution settings
         """
         self.logger: logging.Logger = logger or logging.getLogger(__name__)
         self.orders: dict[str, Order] = {}
         self.order_history: list[Order] = []
         self.next_order_id: int = 1
+        self._config = config
 
     def create_order(
         self,
@@ -208,6 +217,10 @@ class OrderManager:
             raise ValueError(f"Stop price required for {order_type.value} orders")
 
         # Create order
+        metadata = dict(metadata or {})
+        if self._config is not None:
+            metadata.setdefault('commission_rate', self._config.commission_rate)
+            metadata.setdefault('min_commission', self._config.min_commission)
         order = Order(
             symbol=symbol,
             side=side,
@@ -215,7 +228,7 @@ class OrderManager:
             quantity=quantity,
             price=price,
             stop_price=stop_price,
-            metadata=metadata or {},
+            metadata=metadata,
         )
 
         # Store order

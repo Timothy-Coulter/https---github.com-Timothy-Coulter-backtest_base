@@ -12,7 +12,7 @@ from datetime import datetime
 from types import MappingProxyType
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from typing_extensions import Self
 
 from backtester.risk_management.component_configs.comprehensive_risk_config import (
@@ -221,22 +221,6 @@ class PortfolioConfig(BaseModel):
         }
 
 
-class ExecutionConfig(BaseModel):
-    """Execution-related configuration settings."""
-
-    model_config = ConfigDict(
-        use_enum_values=True,
-        arbitrary_types_allowed=True,
-    )
-
-    commission_rate: float = Field(default=0.001, description="Commission rate")
-    min_commission: float = Field(default=1.0, description="Minimum commission")
-    spread: float = Field(default=0.0001, description="Spread")
-    slippage_model: str = Field(default="normal", description="Slippage model")
-    slippage_std: float = Field(default=0.0005, description="Slippage standard deviation")
-    latency_ms: float = Field(default=0.0, description="Latency in milliseconds")
-
-
 class SimulatedBrokerConfig(BaseModel):
     """Configuration for SimulatedBroker parameters."""
 
@@ -253,10 +237,29 @@ class SimulatedBrokerConfig(BaseModel):
     slippage_model: str = Field(
         default="normal", description="Type of slippage model ('normal', 'fixed', 'none')"
     )
+    slippage_distribution: str | None = Field(
+        default=None,
+        description="Optional distribution applied when sampling slippage adjustments",
+    )
     slippage_std: float = Field(
         default=0.0005, description="Standard deviation for slippage simulation"
     )
-    latency_ms: float = Field(default=0.0, description="Simulated latency in milliseconds")
+    latency_ms: float = Field(default=0.0, description="Baseline simulated latency in milliseconds")
+    latency_jitter_ms: float = Field(
+        default=0.0,
+        ge=0.0,
+        description="Additional random latency applied on top of the baseline",
+    )
+    max_orders_per_minute: int = Field(
+        default=0,
+        ge=0,
+        description="Maximum number of orders allowed per rolling minute (0 disables throttling)",
+    )
+    order_cooldown_seconds: float = Field(
+        default=0.0,
+        ge=0.0,
+        description="Minimum number of seconds that must elapse between orders (0 disables cooldown)",
+    )
 
     @field_validator('slippage_model')
     @classmethod
@@ -266,6 +269,46 @@ class SimulatedBrokerConfig(BaseModel):
         if v not in valid_models:
             raise ValueError(f"slippage_model must be one of {valid_models}")
         return v
+
+    @field_validator('slippage_distribution')
+    @classmethod
+    def validate_slippage_distribution(cls, v: str | None) -> str | None:
+        """Validate slippage distribution aliases when explicitly provided."""
+        if v is None:
+            return v
+        valid_distributions = ['normal', 'lognormal', 'fixed', 'none']
+        if v not in valid_distributions:
+            raise ValueError(f"slippage_distribution must be one of {valid_distributions}")
+        return v
+
+    @field_validator('order_cooldown_seconds')
+    @classmethod
+    def validate_cooldown(cls, v: float) -> float:
+        """Ensure cooldown is non-negative."""
+        if v < 0:
+            raise ValueError("order_cooldown_seconds must be non-negative")
+        return v
+
+    @field_validator('max_orders_per_minute')
+    @classmethod
+    def validate_order_rate(cls, v: int) -> int:
+        """Ensure throttling limit is non-negative."""
+        if v < 0:
+            raise ValueError("max_orders_per_minute must be greater than or equal to zero")
+        return v
+
+    @model_validator(mode='after')
+    def _sync_slippage_distribution(self) -> SimulatedBrokerConfig:
+        """Default distribution to match the declared slippage model when unset."""
+        if self.slippage_distribution is None:
+            self.slippage_distribution = self.slippage_model
+        return self
+
+
+class ExecutionConfig(SimulatedBrokerConfig):
+    """Backward-compatible alias for execution component configuration."""
+
+    pass
 
 
 class PerformanceConfig(BaseModel):
@@ -467,18 +510,6 @@ class PortfolioConfigView:
 
 
 @dataclass(frozen=True, slots=True)
-class ExecutionConfigView:
-    """Immutable execution/broker configuration slice."""
-
-    commission_rate: float
-    min_commission: float
-    spread: float
-    slippage_model: str
-    slippage_std: float
-    latency_ms: float
-
-
-@dataclass(frozen=True, slots=True)
 class RiskConfigView:
     """Immutable wrapper around comprehensive risk configuration."""
 
@@ -528,20 +559,6 @@ def build_portfolio_config_view(config: BacktesterConfig) -> PortfolioConfigView
         funding_enabled=funding_enabled,
         tax_rate=float(portfolio.tax_rate or 0.45),
         max_positions=int(portfolio.max_positions or 10),
-    )
-
-
-def build_execution_config_view(config: BacktesterConfig) -> ExecutionConfigView:
-    """Return an immutable execution configuration view."""
-    assert config.execution is not None
-    execution = config.execution
-    return ExecutionConfigView(
-        commission_rate=float(execution.commission_rate or 0.001),
-        min_commission=float(execution.min_commission or 1.0),
-        spread=float(execution.spread or 0.0001),
-        slippage_model=str(execution.slippage_model or "normal"),
-        slippage_std=float(execution.slippage_std or 0.0005),
-        latency_ms=float(execution.latency_ms or 0.0),
     )
 
 
